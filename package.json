@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "npm run build --workspace=minutes-client",
-    "start": "npm run start --workspace=minutes-server",
+    "start": "npm run migrate --workspace=minutes-server && npm run start --workspace=minutes-server",
     "migrate": "npm run migrate --workspace=minutes-server",
     "hash-password": "npm run hash-password --workspace=minutes-server",
     "dev:server": "npm run dev --workspace=minutes-server",
