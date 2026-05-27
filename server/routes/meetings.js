@@ -1,0 +1,103 @@
+import { Router } from 'express';
+import { query } from '../db/index.js';
+
+const router = Router();
+
+router.get('/', async (req, res, next) => {
+  try {
+    const { client_id, project_id, upcoming } = req.query;
+    const params = [];
+    const where = [];
+    if (client_id) { params.push(client_id); where.push(`m.client_id = $${params.length}`); }
+    if (project_id) { params.push(project_id); where.push(`m.project_id = $${params.length}`); }
+    if (upcoming === 'true') { where.push(`m.date >= NOW()`); }
+    const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const order = upcoming === 'true' ? 'ORDER BY m.date ASC' : 'ORDER BY m.date DESC NULLS LAST, m.created_at DESC';
+    const { rows } = await query(
+      `SELECT m.*,
+              c.name AS client_name,
+              p.name AS project_name
+       FROM meetings m
+       LEFT JOIN clients c  ON c.id = m.client_id
+       LEFT JOIN projects p ON p.id = m.project_id
+       ${clause}
+       ${order}`,
+      params,
+    );
+    res.json(rows);
+  } catch (e) { next(e); }
+});
+
+router.get('/:id', async (req, res, next) => {
+  try {
+    const { rows: mrows } = await query(
+      `SELECT m.*,
+              c.name AS client_name,
+              p.name AS project_name
+       FROM meetings m
+       LEFT JOIN clients c  ON c.id = m.client_id
+       LEFT JOIN projects p ON p.id = m.project_id
+       WHERE m.id = $1`,
+      [req.params.id],
+    );
+    if (!mrows[0]) return res.status(404).json({ error: 'not found' });
+    const { rows: actionItems } = await query(
+      'SELECT * FROM action_items WHERE meeting_id = $1 ORDER BY created_at ASC',
+      [req.params.id],
+    );
+    res.json({ ...mrows[0], action_items: actionItems });
+  } catch (e) { next(e); }
+});
+
+router.post('/', async (req, res, next) => {
+  try {
+    const { title, client_id, project_id, date, location, pre_notes, live_notes, summary } = req.body || {};
+    if (!title) return res.status(400).json({ error: 'title required' });
+    const { rows } = await query(
+      `INSERT INTO meetings (title, client_id, project_id, date, location, pre_notes, live_notes, summary)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [
+        title,
+        client_id || null,
+        project_id || null,
+        date || null,
+        location || null,
+        pre_notes || null,
+        live_notes || null,
+        summary || null,
+      ],
+    );
+    res.status(201).json(rows[0]);
+  } catch (e) { next(e); }
+});
+
+router.put('/:id', async (req, res, next) => {
+  try {
+    const { title, client_id, project_id, date, location, pre_notes, live_notes, summary } = req.body || {};
+    const { rows } = await query(
+      `UPDATE meetings SET
+         title       = COALESCE($1, title),
+         client_id   = $2,
+         project_id  = $3,
+         date        = $4,
+         location    = $5,
+         pre_notes   = $6,
+         live_notes  = $7,
+         summary     = $8
+       WHERE id = $9 RETURNING *`,
+      [title, client_id, project_id, date, location, pre_notes, live_notes, summary, req.params.id],
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'not found' });
+    res.json(rows[0]);
+  } catch (e) { next(e); }
+});
+
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const r = await query('DELETE FROM meetings WHERE id = $1', [req.params.id]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
+    res.status(204).end();
+  } catch (e) { next(e); }
+});
+
+export default router;

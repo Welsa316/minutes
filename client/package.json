@@ -1,0 +1,31 @@
+{
+  "name": "minutes-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "generate:icons": "python3 generate-icons.py"
+  },
+  "dependencies": {
+    "@tiptap/extension-link": "^2.10.3",
+    "@tiptap/extension-task-item": "^2.10.3",
+    "@tiptap/extension-task-list": "^2.10.3",
+    "@tiptap/starter-kit": "^2.10.3",
+    "@tiptap/vue-3": "^2.10.3",
+    "axios": "^1.7.9",
+    "pinia": "^2.3.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17",
+    "vite": "^6.0.7",
+    "vite-plugin-pwa": "^0.21.1"
+  }
+}

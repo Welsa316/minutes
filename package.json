@@ -1,0 +1,20 @@
+{
+  "name": "minutes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal CRM + meeting notes for a freelance web developer",
+  "type": "module",
+  "workspaces": ["client", "server"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspace=minutes-client",
+    "start": "npm run start --workspace=minutes-server",
+    "migrate": "npm run migrate --workspace=minutes-server",
+    "hash-password": "npm run hash-password --workspace=minutes-server",
+    "dev:server": "npm run dev --workspace=minutes-server",
+    "dev:client": "npm run dev --workspace=minutes-client",
+    "generate:icons": "npm run generate:icons --workspace=minutes-client"
+  }
+}

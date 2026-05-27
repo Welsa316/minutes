@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'IBM Plex Serif', ui-serif, Georgia, serif;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed select-none;
+  }
+  .btn-primary {
+    @apply btn bg-terracotta text-warm hover:bg-terracotta/90 active:bg-terracotta/80;
+  }
+  .btn-secondary {
+    @apply btn bg-ink text-warm hover:bg-ink/90 active:bg-ink/80;
+  }
+  .btn-ghost {
+    @apply btn text-ink hover:bg-sand/60;
+  }
+
+  .input {
+    @apply w-full px-3 py-2 rounded-md border border-sand bg-warm text-ink placeholder-slate-warm/60 focus:outline-none focus:ring-2 focus:ring-terracotta/40 focus:border-terracotta transition-colors;
+  }
+  .label {
+    @apply block text-sm font-medium text-ink mb-1.5;
+  }
+
+  .card {
+    @apply bg-warm border border-sand rounded-lg p-5;
+  }
+
+  /* Alternating list rows: warm white / sand at 30% */
+  .row-zebra > *:nth-child(even) {
+    background-color: rgba(232, 221, 208, 0.3);
+  }
+}

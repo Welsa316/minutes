@@ -1,0 +1,195 @@
+<script setup>
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute, useRouter, RouterLink } from 'vue-router';
+import { meetings, clients, projects } from '../api/endpoints.js';
+import TiptapEditor from '../components/TiptapEditor.vue';
+import ActionItemList from '../components/ActionItemList.vue';
+
+const route = useRoute();
+const router = useRouter();
+
+const original = ref(null);
+const draft = ref(null);
+const dateLocal = ref('');
+const actionItems = ref([]);
+const allClients = ref([]);
+const allProjects = ref([]);
+const loading = ref(true);
+const saving = ref(false);
+const tab = ref('pre'); // pre | during | after
+
+const filteredProjects = computed(() => {
+  if (!draft.value?.client_id) return allProjects.value;
+  return allProjects.value.filter((p) => p.client_id === Number(draft.value.client_id) || p.id === draft.value.project_id);
+});
+
+const dirty = computed(() => {
+  if (!original.value || !draft.value) return false;
+  const dateIso = dateLocal.value ? new Date(dateLocal.value).toISOString() : null;
+  const cur = { ...draft.value, date: dateIso };
+  const orig = { ...original.value };
+  // Strip joined fields that aren't part of the editable record
+  delete orig.client_name;
+  delete orig.project_name;
+  delete orig.action_items;
+  return JSON.stringify(orig) !== JSON.stringify(cur);
+});
+
+const openActionItems = computed(() => actionItems.value.filter((i) => !i.done).length);
+
+async function load() {
+  loading.value = true;
+  const id = route.params.id;
+  const [m, c, p] = await Promise.all([
+    meetings.get(id),
+    clients.list(),
+    projects.list(),
+  ]);
+  const { action_items, ...rest } = m;
+  original.value = rest;
+  draft.value = { ...rest };
+  delete draft.value.client_name;
+  delete draft.value.project_name;
+  delete draft.value.action_items;
+  dateLocal.value = m.date ? toLocalInput(m.date) : '';
+  actionItems.value = action_items || [];
+  allClients.value = c;
+  allProjects.value = p;
+  loading.value = false;
+}
+
+async function save() {
+  saving.value = true;
+  try {
+    const body = { ...draft.value };
+    body.date = dateLocal.value ? new Date(dateLocal.value).toISOString() : null;
+    delete body.client_name;
+    delete body.project_name;
+    delete body.action_items;
+    const updated = await meetings.update(route.params.id, body);
+    original.value = updated;
+    draft.value = { ...updated };
+    dateLocal.value = updated.date ? toLocalInput(updated.date) : '';
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function destroy() {
+  if (!confirm(`Delete "${original.value.title}"? This cannot be undone.`)) return;
+  await meetings.remove(route.params.id);
+  router.replace('/meetings');
+}
+
+function toLocalInput(iso) {
+  const d = new Date(iso);
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 16);
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+onMounted(load);
+watch(() => route.params.id, load);
+</script>
+
+<template>
+  <div v-if="loading" class="text-sm text-slate-warm">Loading…</div>
+  <div v-else-if="draft" class="max-w-4xl space-y-5">
+    <header class="flex items-center gap-4">
+      <RouterLink to="/meetings" class="text-sm text-slate-warm hover:text-ink">&larr; Meetings</RouterLink>
+      <div class="flex-1" />
+      <button @click="destroy" class="text-sm text-slate-warm hover:text-terracotta">Delete</button>
+      <button @click="save" :disabled="!dirty || saving" class="btn-primary text-sm">
+        {{ saving ? 'Saving…' : dirty ? 'Save' : 'Saved' }}
+      </button>
+    </header>
+
+    <input
+      v-model="draft.title"
+      placeholder="Title"
+      class="w-full text-3xl font-serif text-ink bg-transparent border-none focus:outline-none focus:ring-0 px-0"
+    />
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 card">
+      <div>
+        <label class="label" for="m-date">When</label>
+        <input id="m-date" v-model="dateLocal" type="datetime-local" class="input" />
+      </div>
+      <div>
+        <label class="label" for="m-loc">Where</label>
+        <select id="m-loc" v-model="draft.location" class="input">
+          <option :value="null">—</option>
+          <option value="video">Video</option>
+          <option value="phone">Phone</option>
+          <option value="in-person">In person</option>
+        </select>
+      </div>
+      <div>
+        <label class="label" for="m-client">Client</label>
+        <select id="m-client" v-model="draft.client_id" class="input">
+          <option :value="null">—</option>
+          <option v-for="c in allClients" :key="c.id" :value="c.id">{{ c.name }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="label" for="m-project">Project</label>
+        <select id="m-project" v-model="draft.project_id" class="input">
+          <option :value="null">—</option>
+          <option v-for="p in filteredProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="border-b border-sand flex items-center gap-1">
+      <button
+        @click="tab = 'pre'"
+        :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                 tab === 'pre' ? 'border-terracotta text-ink' : 'border-transparent text-slate-warm hover:text-ink']"
+      >Pre-meeting</button>
+      <button
+        @click="tab = 'during'"
+        :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                 tab === 'during' ? 'border-terracotta text-ink' : 'border-transparent text-slate-warm hover:text-ink']"
+      >During</button>
+      <button
+        @click="tab = 'after'"
+        :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-2',
+                 tab === 'after' ? 'border-terracotta text-ink' : 'border-transparent text-slate-warm hover:text-ink']"
+      >
+        After
+        <span v-if="openActionItems" class="inline-flex items-center justify-center text-xs px-1.5 rounded-full bg-terracotta/15 text-terracotta">{{ openActionItems }}</span>
+      </button>
+    </div>
+
+    <section v-show="tab === 'pre'">
+      <p class="text-sm text-slate-warm mb-2">Prep notes, questions, agenda.</p>
+      <TiptapEditor v-model="draft.pre_notes" min-height="280px" />
+    </section>
+
+    <section v-show="tab === 'during'">
+      <p class="text-sm text-slate-warm mb-2">Live notes during the meeting.</p>
+      <TiptapEditor v-model="draft.live_notes" min-height="360px" />
+    </section>
+
+    <section v-show="tab === 'after'" class="space-y-6">
+      <div>
+        <p class="text-sm text-slate-warm mb-2">Summary.</p>
+        <TiptapEditor v-model="draft.summary" min-height="220px" />
+      </div>
+      <div>
+        <h3 class="font-serif text-lg text-ink mb-2">Action items</h3>
+        <ActionItemList
+          :meeting-id="route.params.id"
+          :items="actionItems"
+          @update:items="actionItems = $event"
+        />
+      </div>
+    </section>
+
+    <p class="text-xs text-slate-warm">Created {{ fmtDate(original.created_at) }}</p>
+  </div>
+</template>
