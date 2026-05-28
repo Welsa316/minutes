@@ -108,10 +108,15 @@ onMounted(load);
       <div v-if="loading" class="text-sm text-slate-warm">Loading…</div>
       <div v-else-if="!filtered.length" class="text-sm text-slate-warm">No meetings.</div>
       <ul v-else class="border border-sand rounded-lg overflow-hidden bg-warm">
-        <li
+        <RouterLink
           v-for="(m, idx) in filtered"
           :key="m.id"
-          @click="router.push(`/meetings/${m.id}`)"
+          :to="`/meetings/${m.id}`"
+          custom
+          v-slot="{ navigate }"
+        >
+        <li
+          @click="navigate"
           :class="['relative pl-4 pr-4 py-3 hover:bg-sand/40 cursor-pointer flex items-center gap-4', idx > 0 && 'border-t border-sand/60']"
         >
           <span v-if="m.client_name" aria-hidden class="absolute left-0 top-0 bottom-0 w-1" :style="{ background: clientColor(m.client_name).bg }" />
@@ -129,6 +134,7 @@ onMounted(load);
           <span v-if="m.location" class="text-xs text-slate-warm capitalize">{{ m.location }}</span>
           <span class="text-xs text-slate-warm tabular-nums whitespace-nowrap">{{ fmtDate(m.date) }}</span>
         </li>
+        </RouterLink>
       </ul>
     </template>
 

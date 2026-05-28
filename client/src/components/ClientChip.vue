@@ -32,6 +32,7 @@ const target = computed(() => props.to || (linkId.value ? `/clients/${linkId.val
     :is="tag"
     v-if="displayName"
     :to="target"
+    @click.stop
     :class="['inline-flex items-center font-medium', sizeClasses.wrap, target && 'hover:opacity-80']"
   >
     <span

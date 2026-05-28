@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, RouterLink } from 'vue-router';
 import { notes as api } from '../api/endpoints.js';
 
 const router = useRouter();
@@ -83,11 +83,16 @@ onMounted(load);
     <div v-if="loading" class="text-sm text-slate-warm">Loading…</div>
     <div v-else-if="!filtered.length" class="text-sm text-slate-warm">No notes.</div>
     <ul v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <li
+      <RouterLink
         v-for="n in filtered"
         :key="n.id"
-        @click="router.push(`/notes/${n.id}`)"
-        class="card cursor-pointer hover:border-slate-warm/40 transition-colors"
+        :to="`/notes/${n.id}`"
+        custom
+        v-slot="{ navigate }"
+      >
+      <li
+        @click="navigate"
+        class="card cursor-pointer hover:border-slate-warm/40 transition-colors block"
       >
         <div class="font-medium text-ink truncate mb-1">{{ n.title }}</div>
         <p class="text-sm text-slate-warm line-clamp-3 mb-3">{{ stripHtml(n.body) || '—' }}</p>
@@ -98,6 +103,7 @@ onMounted(load);
           <span class="text-xs text-slate-warm whitespace-nowrap">{{ fmtDate(n.created_at) }}</span>
         </div>
       </li>
+      </RouterLink>
     </ul>
   </div>
 </template>
