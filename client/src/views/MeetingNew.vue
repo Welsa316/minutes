@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, RouterLink } from 'vue-router';
 import { meetings, clients, projects } from '../api/endpoints.js';
+import SmartDateInput from '../components/SmartDateInput.vue';
 
 const router = useRouter();
 const allClients = ref([]);
@@ -85,7 +86,7 @@ onMounted(async () => {
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="label" for="date">When</label>
-          <input id="date" v-model="date" type="datetime-local" class="input" />
+          <SmartDateInput v-model="date" placeholder="tomorrow 2pm, next mon…" />
         </div>
         <div>
           <label class="label" for="location">Where</label>

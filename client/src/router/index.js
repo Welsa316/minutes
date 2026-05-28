@@ -22,6 +22,9 @@ const routes = [
       { path: 'meetings/:id',    name: 'meeting',     component: () => import('../views/MeetingDetail.vue') },
       { path: 'notes',           name: 'notes',       component: () => import('../views/Notes.vue') },
       { path: 'notes/:id',       name: 'note',        component: () => import('../views/NoteDetail.vue') },
+      { path: 'tags',            name: 'tags',        component: () => import('../views/Tags.vue') },
+      { path: 'tags/:name',      name: 'tag',         component: () => import('../views/TagDetail.vue') },
+      { path: 'calendar',        name: 'calendar',    redirect: '/meetings?view=calendar' },
     ],
   },
 ];

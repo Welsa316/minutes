@@ -13,6 +13,9 @@ import meetingsRoutes from './routes/meetings.js';
 import notesRoutes from './routes/notes.js';
 import actionItemsRoutes from './routes/actionItems.js';
 import searchRoutes from './routes/search.js';
+import tagsRoutes from './routes/tags.js';
+import pinnedRoutes from './routes/pinned.js';
+import savedViewsRoutes from './routes/savedViews.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -43,6 +46,9 @@ app.use('/api/meetings', requireAuth, meetingsRoutes);
 app.use('/api/notes', requireAuth, notesRoutes);
 app.use('/api/action-items', requireAuth, actionItemsRoutes);
 app.use('/api/search', requireAuth, searchRoutes);
+app.use('/api/tags', requireAuth, tagsRoutes);
+app.use('/api/pinned', requireAuth, pinnedRoutes);
+app.use('/api/saved-views', requireAuth, savedViewsRoutes);
 
 // In production, serve the built client from /client/dist. SPA fallback: any
 // non-/api request goes to index.html so vue-router can handle the route.

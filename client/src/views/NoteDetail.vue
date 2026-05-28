@@ -3,6 +3,10 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
 import { notes } from '../api/endpoints.js';
 import TiptapEditor from '../components/TiptapEditor.vue';
+import TagPicker from '../components/TagPicker.vue';
+import PinButton from '../components/PinButton.vue';
+import { useRecent } from '../composables/useRecent.js';
+const recent = useRecent();
 
 const route = useRoute();
 const router = useRouter();
@@ -33,6 +37,7 @@ async function load() {
   draft.value = { ...n };
   tagsInput.value = (n.tags || []).join(', ');
   loading.value = false;
+  recent.visit({ kind: 'note', id: n.id, title: n.title });
 }
 
 async function save() {
@@ -67,6 +72,7 @@ watch(() => route.params.id, load);
     <header class="flex items-center gap-4">
       <RouterLink to="/notes" class="text-sm text-slate-warm hover:text-ink">&larr; Notes</RouterLink>
       <div class="flex-1" />
+      <PinButton entity-type="note" :entity-id="route.params.id" />
       <button @click="destroy" class="text-sm text-slate-warm hover:text-terracotta">Delete</button>
       <button @click="save" :disabled="!dirty || saving" class="btn-primary text-sm">
         {{ saving ? 'Saving…' : dirty ? 'Save' : 'Saved' }}
@@ -79,8 +85,10 @@ watch(() => route.params.id, load);
       class="w-full text-3xl font-serif text-ink bg-transparent border-none focus:outline-none focus:ring-0 px-0"
     />
 
-    <div class="flex items-center gap-3 text-sm">
-      <label class="text-slate-warm" for="tags">Tags</label>
+    <TagPicker entity-type="note" :entity-id="route.params.id" :initial="original.universal_tags || []" />
+
+    <div v-if="false" class="flex items-center gap-3 text-sm">
+      <label class="text-slate-warm" for="tags">Legacy tags</label>
       <input
         id="tags"
         v-model="tagsInput"

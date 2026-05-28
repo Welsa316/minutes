@@ -5,15 +5,26 @@ const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { status } = req.query;
+    const { status, tag } = req.query;
     const params = [];
-    let where = '';
-    if (status) {
-      params.push(status);
-      where = `WHERE status = $${params.length}`;
+    const conds = [];
+    if (status) { params.push(status); conds.push(`c.status = $${params.length}`); }
+    if (tag) {
+      params.push(tag);
+      conds.push(`EXISTS (SELECT 1 FROM entity_tags et2
+                          JOIN tags t2 ON t2.id = et2.tag_id
+                          WHERE et2.entity_type='client' AND et2.entity_id=c.id AND t2.name=$${params.length})`);
     }
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
     const { rows } = await query(
-      `SELECT * FROM clients ${where} ORDER BY created_at DESC`,
+      `SELECT c.*,
+              COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS tags
+       FROM clients c
+       LEFT JOIN entity_tags et ON et.entity_type='client' AND et.entity_id=c.id
+       LEFT JOIN tags t ON t.id = et.tag_id
+       ${where}
+       GROUP BY c.id
+       ORDER BY c.created_at DESC`,
       params,
     );
     res.json(rows);
@@ -22,7 +33,16 @@ router.get('/', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
-    const { rows } = await query('SELECT * FROM clients WHERE id = $1', [req.params.id]);
+    const { rows } = await query(
+      `SELECT c.*,
+              COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS tags
+       FROM clients c
+       LEFT JOIN entity_tags et ON et.entity_type='client' AND et.entity_id=c.id
+       LEFT JOIN tags t ON t.id = et.tag_id
+       WHERE c.id = $1
+       GROUP BY c.id`,
+      [req.params.id],
+    );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
   } catch (e) { next(e); }

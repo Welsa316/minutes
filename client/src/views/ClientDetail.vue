@@ -4,6 +4,11 @@ import { useRoute, useRouter, RouterLink } from 'vue-router';
 import { clients, projects, meetings } from '../api/endpoints.js';
 import TiptapEditor from '../components/TiptapEditor.vue';
 import StatusBadge from '../components/StatusBadge.vue';
+import TagPicker from '../components/TagPicker.vue';
+import ClientChip from '../components/ClientChip.vue';
+import PinButton from '../components/PinButton.vue';
+import { useRecent } from '../composables/useRecent.js';
+const recent = useRecent();
 
 const route = useRoute();
 const router = useRouter();
@@ -33,6 +38,7 @@ async function load() {
   relatedProjects.value = p;
   relatedMeetings.value = m;
   loading.value = false;
+  recent.visit({ kind: 'client', id: c.id, title: c.name });
 }
 
 async function save() {
@@ -67,6 +73,7 @@ watch(() => route.params.id, load);
     <header class="flex items-center gap-4">
       <RouterLink to="/clients" class="text-sm text-slate-warm hover:text-ink">&larr; Clients</RouterLink>
       <div class="flex-1" />
+      <PinButton entity-type="client" :entity-id="route.params.id" />
       <button @click="destroy" class="text-sm text-slate-warm hover:text-terracotta">Delete</button>
       <button @click="save" :disabled="!dirty || saving" class="btn-primary text-sm">
         {{ saving ? 'Saving…' : dirty ? 'Save' : 'Saved' }}
@@ -81,9 +88,10 @@ watch(() => route.params.id, load);
       />
 
       <div class="flex items-center gap-3 flex-wrap text-sm">
+        <ClientChip :client="original" size="md" hide-label />
         <StatusBadge :status="draft.status" variant="client" />
-        <span class="text-slate-warm">·</span>
-        <span class="text-slate-warm">Added {{ fmtDate(original.created_at) }}</span>
+        <TagPicker entity-type="client" :entity-id="route.params.id" :initial="original.tags || []" />
+        <span class="text-slate-warm ml-auto">Added {{ fmtDate(original.created_at) }}</span>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 card">

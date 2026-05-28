@@ -1,10 +1,16 @@
 <script setup>
 import { watch, onBeforeUnmount } from 'vue';
+import { useRouter } from 'vue-router';
 import { useEditor, EditorContent } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Link from '@tiptap/extension-link';
+import Mention from '@tiptap/extension-mention';
+import 'tippy.js/dist/tippy.css';
+import { mentionSuggestion, SlashCommand } from '../composables/tiptapSuggestions.js';
+
+const router = useRouter();
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -25,9 +31,39 @@ const editor = useEditor({
       autolink: true,
       HTMLAttributes: { rel: 'noopener noreferrer' },
     }),
+    Mention.configure({
+      HTMLAttributes: { class: 'mention' },
+      renderLabel({ options, node }) {
+        const kind = node.attrs.kind || 'item';
+        return `${options.suggestion.char}${node.attrs.label}`;
+      },
+      suggestion: mentionSuggestion(),
+    }).extend({
+      addAttributes() {
+        return {
+          id: { default: null, parseHTML: (el) => el.getAttribute('data-id'), renderHTML: (a) => ({ 'data-id': a.id }) },
+          label: { default: null, parseHTML: (el) => el.getAttribute('data-label'), renderHTML: (a) => ({ 'data-label': a.label }) },
+          kind: { default: null, parseHTML: (el) => el.getAttribute('data-kind'), renderHTML: (a) => ({ 'data-kind': a.kind }) },
+        };
+      },
+    }),
+    SlashCommand,
   ],
   editorProps: {
     attributes: { class: 'tp-prose focus:outline-none' },
+    handleClick: (view, pos, event) => {
+      // Make @mentions clickable: navigate to the linked entity
+      const target = event.target;
+      if (target?.classList?.contains('mention')) {
+        const kind = target.getAttribute('data-kind');
+        const id = target.getAttribute('data-id');
+        if (kind && id) {
+          router.push(kind === 'client' ? `/clients/${id}` : `/projects/${id}`);
+          return true;
+        }
+      }
+      return false;
+    },
   },
   onUpdate: ({ editor }) => emit('update:modelValue', editor.getHTML()),
 });
@@ -111,4 +147,17 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
 .tp-prose code { background: theme('colors.sand'); padding: 0.125rem 0.25rem; border-radius: 0.25rem; font-size: 0.875em; }
 .tp-prose pre { background: theme('colors.ink'); color: theme('colors.warm'); padding: 0.75rem; border-radius: 0.375rem; overflow-x: auto; }
 .tp-prose pre code { background: transparent; padding: 0; color: inherit; }
+.tp-prose .mention {
+  background: theme('colors.sand');
+  color: theme('colors.ink');
+  padding: 0.05rem 0.4rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 0.95em;
+}
+.tp-prose .mention:hover { background: theme('colors.terracotta'); color: theme('colors.warm'); }
+.tippy-box { background: transparent !important; }
+.tippy-arrow { display: none !important; }
+.tippy-content { padding: 0 !important; }
 </style>

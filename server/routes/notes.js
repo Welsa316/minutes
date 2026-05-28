@@ -10,10 +10,19 @@ router.get('/', async (req, res, next) => {
     let where = '';
     if (tag) {
       params.push(tag);
-      where = `WHERE $${params.length} = ANY(tags)`;
+      where = `WHERE EXISTS (SELECT 1 FROM entity_tags et2 JOIN tags t2 ON t2.id=et2.tag_id
+                              WHERE et2.entity_type='note' AND et2.entity_id=n.id AND t2.name=$${params.length})
+                 OR $${params.length} = ANY(n.tags)`;
     }
     const { rows } = await query(
-      `SELECT * FROM notes ${where} ORDER BY created_at DESC`,
+      `SELECT n.*,
+              COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS universal_tags
+       FROM notes n
+       LEFT JOIN entity_tags et ON et.entity_type='note' AND et.entity_id=n.id
+       LEFT JOIN tags t ON t.id = et.tag_id
+       ${where}
+       GROUP BY n.id
+       ORDER BY n.created_at DESC`,
       params,
     );
     res.json(rows);
@@ -22,7 +31,16 @@ router.get('/', async (req, res, next) => {
 
 router.get('/:id', async (req, res, next) => {
   try {
-    const { rows } = await query('SELECT * FROM notes WHERE id = $1', [req.params.id]);
+    const { rows } = await query(
+      `SELECT n.*,
+              COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS universal_tags
+       FROM notes n
+       LEFT JOIN entity_tags et ON et.entity_type='note' AND et.entity_id=n.id
+       LEFT JOIN tags t ON t.id = et.tag_id
+       WHERE n.id = $1
+       GROUP BY n.id`,
+      [req.params.id],
+    );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
   } catch (e) { next(e); }

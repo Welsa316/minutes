@@ -3,6 +3,11 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
 import { projects, clients, meetings } from '../api/endpoints.js';
 import StatusBadge from '../components/StatusBadge.vue';
+import SmartDateInput from '../components/SmartDateInput.vue';
+import TagPicker from '../components/TagPicker.vue';
+import PinButton from '../components/PinButton.vue';
+import { useRecent } from '../composables/useRecent.js';
+const recent = useRecent();
 
 const route = useRoute();
 const router = useRouter();
@@ -38,6 +43,7 @@ async function load() {
   clientOptions.value = c;
   relatedMeetings.value = m;
   loading.value = false;
+  recent.visit({ kind: 'project', id: p.id, title: p.name });
 }
 
 async function save() {
@@ -81,6 +87,7 @@ watch(() => route.params.id, load);
     <header class="flex items-center gap-4">
       <RouterLink to="/projects" class="text-sm text-slate-warm hover:text-ink">&larr; Projects</RouterLink>
       <div class="flex-1" />
+      <PinButton entity-type="project" :entity-id="route.params.id" />
       <button @click="destroy" class="text-sm text-slate-warm hover:text-terracotta">Delete</button>
       <button @click="save" :disabled="!dirty || saving" class="btn-primary text-sm">
         {{ saving ? 'Saving…' : dirty ? 'Save' : 'Saved' }}
@@ -96,6 +103,7 @@ watch(() => route.params.id, load);
 
       <div class="flex items-center gap-3 flex-wrap text-sm">
         <StatusBadge :status="draft.status" variant="project" />
+        <TagPicker entity-type="project" :entity-id="route.params.id" :initial="original.tags || []" />
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 card">
@@ -117,7 +125,7 @@ watch(() => route.params.id, load);
         </div>
         <div>
           <label class="label" for="deadline">Deadline</label>
-          <input id="deadline" type="date" :value="ymd(draft.deadline)" @change="draft.deadline = $event.target.value || null" class="input" />
+          <SmartDateInput :model-value="draft.deadline" @update:model-value="draft.deadline = $event" mode="date" placeholder="next fri…" />
         </div>
         <div>
           <label class="label" for="budget">Budget ($)</label>

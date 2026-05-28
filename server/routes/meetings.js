@@ -5,22 +5,33 @@ const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { client_id, project_id, upcoming } = req.query;
+    const { client_id, project_id, upcoming, tag, from, to } = req.query;
     const params = [];
-    const where = [];
-    if (client_id) { params.push(client_id); where.push(`m.client_id = $${params.length}`); }
-    if (project_id) { params.push(project_id); where.push(`m.project_id = $${params.length}`); }
-    if (upcoming === 'true') { where.push(`m.date >= NOW()`); }
-    const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const conds = [];
+    if (client_id) { params.push(client_id); conds.push(`m.client_id = $${params.length}`); }
+    if (project_id) { params.push(project_id); conds.push(`m.project_id = $${params.length}`); }
+    if (upcoming === 'true') { conds.push(`m.date >= NOW()`); }
+    if (from) { params.push(from); conds.push(`m.date >= $${params.length}`); }
+    if (to) { params.push(to); conds.push(`m.date <= $${params.length}`); }
+    if (tag) {
+      params.push(tag);
+      conds.push(`EXISTS (SELECT 1 FROM entity_tags et2 JOIN tags t2 ON t2.id=et2.tag_id
+                          WHERE et2.entity_type='meeting' AND et2.entity_id=m.id AND t2.name=$${params.length})`);
+    }
+    const clause = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
     const order = upcoming === 'true' ? 'ORDER BY m.date ASC' : 'ORDER BY m.date DESC NULLS LAST, m.created_at DESC';
     const { rows } = await query(
       `SELECT m.*,
               c.name AS client_name,
-              p.name AS project_name
+              p.name AS project_name,
+              COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS tags
        FROM meetings m
        LEFT JOIN clients c  ON c.id = m.client_id
        LEFT JOIN projects p ON p.id = m.project_id
+       LEFT JOIN entity_tags et ON et.entity_type='meeting' AND et.entity_id=m.id
+       LEFT JOIN tags t ON t.id = et.tag_id
        ${clause}
+       GROUP BY m.id, c.name, p.name
        ${order}`,
       params,
     );
@@ -33,11 +44,15 @@ router.get('/:id', async (req, res, next) => {
     const { rows: mrows } = await query(
       `SELECT m.*,
               c.name AS client_name,
-              p.name AS project_name
+              p.name AS project_name,
+              COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS tags
        FROM meetings m
        LEFT JOIN clients c  ON c.id = m.client_id
        LEFT JOIN projects p ON p.id = m.project_id
-       WHERE m.id = $1`,
+       LEFT JOIN entity_tags et ON et.entity_type='meeting' AND et.entity_id=m.id
+       LEFT JOIN tags t ON t.id = et.tag_id
+       WHERE m.id = $1
+       GROUP BY m.id, c.name, p.name`,
       [req.params.id],
     );
     if (!mrows[0]) return res.status(404).json({ error: 'not found' });

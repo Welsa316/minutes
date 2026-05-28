@@ -5,17 +5,26 @@ const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { status, client_id } = req.query;
+    const { status, client_id, tag } = req.query;
     const params = [];
-    const where = [];
-    if (status) { params.push(status); where.push(`p.status = $${params.length}`); }
-    if (client_id) { params.push(client_id); where.push(`p.client_id = $${params.length}`); }
-    const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const conds = [];
+    if (status) { params.push(status); conds.push(`p.status = $${params.length}`); }
+    if (client_id) { params.push(client_id); conds.push(`p.client_id = $${params.length}`); }
+    if (tag) {
+      params.push(tag);
+      conds.push(`EXISTS (SELECT 1 FROM entity_tags et2 JOIN tags t2 ON t2.id=et2.tag_id
+                          WHERE et2.entity_type='project' AND et2.entity_id=p.id AND t2.name=$${params.length})`);
+    }
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
     const { rows } = await query(
-      `SELECT p.*, c.name AS client_name
+      `SELECT p.*, c.name AS client_name,
+              COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS tags
        FROM projects p
        LEFT JOIN clients c ON c.id = p.client_id
-       ${clause}
+       LEFT JOIN entity_tags et ON et.entity_type='project' AND et.entity_id=p.id
+       LEFT JOIN tags t ON t.id = et.tag_id
+       ${where}
+       GROUP BY p.id, c.name
        ORDER BY p.created_at DESC`,
       params,
     );
@@ -26,10 +35,14 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT p.*, c.name AS client_name
+      `SELECT p.*, c.name AS client_name,
+              COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS tags
        FROM projects p
        LEFT JOIN clients c ON c.id = p.client_id
-       WHERE p.id = $1`,
+       LEFT JOIN entity_tags et ON et.entity_type='project' AND et.entity_id=p.id
+       LEFT JOIN tags t ON t.id = et.tag_id
+       WHERE p.id = $1
+       GROUP BY p.id, c.name`,
       [req.params.id],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });

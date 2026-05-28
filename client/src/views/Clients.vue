@@ -3,6 +3,19 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { clients as api } from '../api/endpoints.js';
 import StatusBadge from '../components/StatusBadge.vue';
+import ClientChip from '../components/ClientChip.vue';
+import TagChip from '../components/TagChip.vue';
+import { clientColor } from '../utils/colors.js';
+import { useToastStore } from '../stores/toast.js';
+
+const toast = useToastStore();
+
+async function setStatus(client, status) {
+  const prev = client.status;
+  client.status = status;
+  try { await api.update(client.id, { status }); }
+  catch { client.status = prev; toast.error('Failed to update status'); }
+}
 
 const router = useRouter();
 const items = ref([]);
@@ -55,14 +68,23 @@ onMounted(load);
         v-for="(c, idx) in items"
         :key="c.id"
         @click="router.push(`/clients/${c.id}`)"
-        :class="['px-4 py-3 hover:bg-sand/40 cursor-pointer flex items-center gap-4 transition-colors', idx > 0 && 'border-t border-sand/60']"
+        :class="['relative pl-4 pr-4 py-3 hover:bg-sand/40 cursor-pointer flex items-center gap-4 transition-colors', idx > 0 && 'border-t border-sand/60']"
       >
+        <span
+          aria-hidden
+          class="absolute left-0 top-0 bottom-0 w-1"
+          :style="{ background: clientColor(c.name).bg }"
+        />
+        <ClientChip :client="c" size="md" hide-label />
         <div class="flex-1 min-w-0">
           <div class="font-medium text-ink truncate">{{ c.name }}</div>
-          <div v-if="c.company" class="text-sm text-slate-warm truncate">{{ c.company }}</div>
+          <div class="flex items-center gap-2 flex-wrap text-sm text-slate-warm">
+            <span v-if="c.company" class="truncate">{{ c.company }}</span>
+            <TagChip v-for="t in c.tags" :key="t" :tag="t" size="xs" />
+          </div>
         </div>
         <span v-if="c.source" class="text-xs text-slate-warm capitalize">{{ c.source }}</span>
-        <StatusBadge :status="c.status" variant="client" />
+        <StatusBadge :status="c.status" variant="client" editable @change="setStatus(c, $event)" />
       </li>
     </ul>
   </div>
