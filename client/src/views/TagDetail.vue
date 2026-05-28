@@ -51,7 +51,7 @@ watch(() => route.params.name, load);
     <template v-else>
       <section v-if="data.clients.length">
         <h2 class="font-serif text-lg text-ink mb-2">Clients</h2>
-        <ul class="border border-sand rounded-lg overflow-hidden bg-warm">
+        <ul class="border border-sand rounded-lg overflow-hidden bg-surface">
           <li
             v-for="(c, idx) in data.clients"
             :key="c.id"
@@ -66,7 +66,7 @@ watch(() => route.params.name, load);
 
       <section v-if="data.projects.length">
         <h2 class="font-serif text-lg text-ink mb-2">Projects</h2>
-        <ul class="border border-sand rounded-lg overflow-hidden bg-warm">
+        <ul class="border border-sand rounded-lg overflow-hidden bg-surface">
           <li
             v-for="(p, idx) in data.projects"
             :key="p.id"
@@ -81,7 +81,7 @@ watch(() => route.params.name, load);
 
       <section v-if="data.meetings.length">
         <h2 class="font-serif text-lg text-ink mb-2">Meetings</h2>
-        <ul class="border border-sand rounded-lg overflow-hidden bg-warm">
+        <ul class="border border-sand rounded-lg overflow-hidden bg-surface">
           <li
             v-for="(m, idx) in data.meetings"
             :key="m.id"
@@ -96,7 +96,7 @@ watch(() => route.params.name, load);
 
       <section v-if="data.notes.length">
         <h2 class="font-serif text-lg text-ink mb-2">Notes</h2>
-        <ul class="border border-sand rounded-lg overflow-hidden bg-warm">
+        <ul class="border border-sand rounded-lg overflow-hidden bg-surface">
           <li
             v-for="(n, idx) in data.notes"
             :key="n.id"

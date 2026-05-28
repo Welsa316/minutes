@@ -9,7 +9,9 @@ import { meetings as api } from '../api/endpoints.js';
 import ClientChip from '../components/ClientChip.vue';
 import TagChip from '../components/TagChip.vue';
 import SavedViewsBar from '../components/SavedViewsBar.vue';
+import EmptyState from '../components/EmptyState.vue';
 import { clientColor } from '../utils/colors.js';
+import { useListNav } from '../composables/useListNav.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -74,6 +76,11 @@ function fmtTime(d) {
   return format(new Date(d), 'h:mm a');
 }
 
+const { selectedId } = useListNav({
+  items: computed(() => view.value === 'list' ? filtered.value : []),
+  pathFor: (m) => `/meetings/${m.id}`,
+});
+
 watch(view, (v) => {
   router.replace({ query: { ...route.query, view: v === 'calendar' ? 'calendar' : undefined } });
 });
@@ -106,8 +113,14 @@ onMounted(load);
       </div>
 
       <div v-if="loading" class="text-sm text-slate-warm">Loading…</div>
-      <div v-else-if="!filtered.length" class="text-sm text-slate-warm">No meetings.</div>
-      <ul v-else class="border border-sand rounded-lg overflow-hidden bg-warm">
+      <EmptyState
+        v-else-if="!filtered.length"
+        icon="◷"
+        title="No meetings"
+        hint="Track every conversation. Prep, capture, then close out with action items."
+        shortcut="⌘N"
+      />
+      <ul v-else class="border border-sand rounded-lg overflow-hidden bg-surface">
         <RouterLink
           v-for="(m, idx) in filtered"
           :key="m.id"
@@ -117,7 +130,7 @@ onMounted(load);
         >
         <li
           @click="navigate"
-          :class="['relative pl-4 pr-4 py-3 hover:bg-sand/40 cursor-pointer flex items-center gap-4', idx > 0 && 'border-t border-sand/60']"
+          :class="['relative pl-4 pr-4 py-3 hover:bg-sand/40 cursor-pointer flex items-center gap-4', idx > 0 && 'border-t border-sand/60', selectedId === m.id && 'bg-sand/30 ring-1 ring-inset ring-terracotta/30']"
         >
           <span v-if="m.client_name" aria-hidden class="absolute left-0 top-0 bottom-0 w-1" :style="{ background: clientColor(m.client_name).bg }" />
           <div class="flex-1 min-w-0">
@@ -150,13 +163,13 @@ onMounted(load);
       </div>
 
       <div class="grid grid-cols-7 gap-px bg-sand rounded-lg overflow-hidden border border-sand">
-        <div v-for="d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']" :key="d" class="bg-warm text-center py-2 text-[11px] uppercase tracking-wider text-slate-warm">{{ d }}</div>
+        <div v-for="d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']" :key="d" class="bg-surface text-center py-2 text-[11px] uppercase tracking-wider text-slate-warm">{{ d }}</div>
         <div
           v-for="d in gridDays"
           :key="d.toISOString()"
           :class="[
-            'bg-warm p-1.5 min-h-[5.5rem] flex flex-col gap-1',
-            !isSameMonth(d, cursor) && 'bg-warm opacity-40',
+            'bg-surface p-1.5 min-h-[5.5rem] flex flex-col gap-1',
+            !isSameMonth(d, cursor) && 'opacity-40',
           ]"
         >
           <div :class="['text-xs', isToday(d) ? 'font-semibold text-terracotta' : 'text-slate-warm']">

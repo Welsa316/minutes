@@ -6,8 +6,12 @@ import { projects as api, clients as clientsApi } from '../api/endpoints.js';
 import StatusBadge from '../components/StatusBadge.vue';
 import ClientChip from '../components/ClientChip.vue';
 import TagChip from '../components/TagChip.vue';
+import EmptyState from '../components/EmptyState.vue';
 import { useToastStore } from '../stores/toast.js';
 import { clientColor } from '../utils/colors.js';
+import { useListNav } from '../composables/useListNav.js';
+
+const createInput = ref(null);
 
 const route = useRoute();
 const router = useRouter();
@@ -86,6 +90,12 @@ function fmtDeadline(d) {
   return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+const { selectedId } = useListNav({
+  items: computed(() => view.value === 'list' ? items.value : []),
+  pathFor: (p) => `/projects/${p.id}`,
+  createInput,
+});
+
 watch(view, (v) => {
   router.replace({ query: { ...route.query, view: v === 'kanban' ? 'kanban' : undefined } });
 });
@@ -106,8 +116,9 @@ onMounted(load);
 
     <form @submit.prevent="create" class="card flex items-center gap-3 py-2.5 px-4">
       <input
+        ref="createInput"
         v-model="newName"
-        placeholder="New project name…"
+        placeholder="New project name… (press c)"
         class="flex-1 bg-transparent focus:outline-none placeholder-slate-warm/60"
       />
       <select v-model="newClient" class="text-sm bg-transparent text-slate-warm focus:outline-none">
@@ -120,12 +131,12 @@ onMounted(load);
     <div v-if="loading" class="text-sm text-slate-warm">Loading…</div>
 
     <!-- List view -->
-    <ul v-else-if="view === 'list' && items.length" class="border border-sand rounded-lg overflow-hidden bg-warm">
+    <ul v-else-if="view === 'list' && items.length" class="border border-sand rounded-lg overflow-hidden bg-surface">
       <li
         v-for="(p, idx) in items"
         :key="p.id"
         @click="router.push(`/projects/${p.id}`)"
-        :class="['relative pl-4 pr-4 py-3 hover:bg-sand/40 cursor-pointer flex items-center gap-4', idx > 0 && 'border-t border-sand/60']"
+        :class="['relative pl-4 pr-4 py-3 hover:bg-sand/40 cursor-pointer flex items-center gap-4', idx > 0 && 'border-t border-sand/60', selectedId === p.id && 'bg-sand/30 ring-1 ring-inset ring-terracotta/30']"
       >
         <span v-if="p.client_name" aria-hidden class="absolute left-0 top-0 bottom-0 w-1" :style="{ background: clientColor(p.client_name).bg }" />
         <div class="flex-1 min-w-0">
@@ -139,7 +150,12 @@ onMounted(load);
         <StatusBadge :status="p.status" variant="project" editable @change="setStatus(p, $event)" />
       </li>
     </ul>
-    <p v-else-if="view === 'list'" class="text-sm text-slate-warm">No projects yet.</p>
+    <EmptyState
+      v-else-if="view === 'list'"
+      icon="▤"
+      title="No projects yet"
+      hint="Add a project to start tracking work for a client."
+    />
 
     <!-- Kanban view -->
     <div v-if="view === 'kanban' && !loading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -161,7 +177,7 @@ onMounted(load);
             v-for="p in byStatus[col.id]"
             :key="p.id"
             @click="router.push(`/projects/${p.id}`)"
-            class="bg-warm border border-sand rounded-md p-2.5 cursor-grab active:cursor-grabbing hover:border-slate-warm/40 hover:shadow-sm transition-shadow group"
+            class="bg-surface border border-sand rounded-md p-2.5 cursor-grab active:cursor-grabbing hover:border-slate-warm/40 hover:shadow-sm transition-shadow group"
           >
             <div class="flex items-start gap-2">
               <span

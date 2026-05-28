@@ -24,7 +24,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="bg-warm border border-sand rounded-md shadow-lg overflow-hidden min-w-[14rem] py-1 max-h-72 overflow-y-auto">
+  <div class="bg-surface border border-sand rounded-md shadow-lg overflow-hidden min-w-[14rem] py-1 max-h-72 overflow-y-auto">
     <button
       v-for="(item, idx) in items"
       :key="item.label"

@@ -3,7 +3,10 @@ import { ref, onMounted, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { pinned as pinnedApi } from '../api/endpoints.js';
 import { useRecent } from '../composables/useRecent.js';
+import { useSettingsStore } from '../stores/settings.js';
 import { clientColor, initials } from '../utils/colors.js';
+
+const settings = useSettingsStore();
 
 defineEmits(['logout']);
 
@@ -106,8 +109,24 @@ watch(() => route.fullPath, loadPinned);
 
     <div class="p-3 border-t border-sand space-y-2">
       <RouterLink to="/meetings/new" class="btn-primary w-full text-sm">+ New meeting</RouterLink>
-      <button class="btn-ghost w-full text-sm" @click="$emit('logout')">Sign out</button>
-      <p class="text-[10px] text-slate-warm text-center pt-1">Cmd+K · Cmd+N</p>
+      <div class="flex items-center gap-1">
+        <button class="btn-ghost flex-1 text-sm" @click="$emit('logout')">Sign out</button>
+        <button
+          class="btn-ghost px-2 text-sm"
+          @click="settings.sound = !settings.sound"
+          :title="settings.sound ? 'Sound on' : 'Sound off'"
+        >{{ settings.sound ? '♪' : '·' }}</button>
+        <button
+          class="btn-ghost px-2 text-sm"
+          @click="settings.cycleTheme"
+          :title="`Theme: ${settings.theme} (click to cycle)`"
+        >
+          <span v-if="settings.theme === 'light'">☀</span>
+          <span v-else-if="settings.theme === 'dark'">☾</span>
+          <span v-else>⌖</span>
+        </button>
+      </div>
+      <p class="text-[10px] text-slate-warm text-center pt-1">Cmd+K · Cmd+N · ?</p>
     </div>
   </aside>
 </template>

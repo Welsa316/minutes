@@ -91,7 +91,7 @@ function clear() {
     >×</button>
     <p
       v-if="focused && preview && preview !== raw"
-      class="absolute left-0 top-full mt-1 text-xs text-slate-warm bg-warm border border-sand rounded px-2 py-1 z-10 shadow-sm"
+      class="absolute left-0 top-full mt-1 text-xs text-slate-warm bg-surface border border-sand rounded px-2 py-1 z-10 shadow-sm"
     >→ {{ preview }}</p>
   </div>
 </template>

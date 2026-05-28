@@ -90,7 +90,7 @@ onMounted(loadAll);
       />
       <div
         v-if="suggesting && (suggestions.length || input.trim())"
-        class="absolute left-0 top-full mt-1 bg-warm border border-sand rounded-md shadow-md z-20 min-w-[8rem] py-1"
+        class="absolute left-0 top-full mt-1 bg-surface border border-sand rounded-md shadow-md z-20 min-w-[8rem] py-1"
       >
         <button
           v-for="s in suggestions"

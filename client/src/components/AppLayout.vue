@@ -19,7 +19,11 @@ async function onLogout() {
     <div class="flex-1 flex flex-col min-w-0">
       <TopNav />
       <main class="flex-1 p-6 lg:p-8 overflow-y-auto">
-        <RouterView />
+        <RouterView v-slot="{ Component, route }">
+          <Transition name="page" mode="out-in">
+            <component :is="Component" :key="route.fullPath" />
+          </Transition>
+        </RouterView>
       </main>
     </div>
   </div>

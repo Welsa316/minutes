@@ -140,7 +140,7 @@ watch(() => route.params.id, load);
 
     <section v-if="relatedMeetings.length">
       <h2 class="font-serif text-lg text-ink mb-2">Meetings</h2>
-      <ul class="border border-sand rounded-lg overflow-hidden bg-warm">
+      <ul class="border border-sand rounded-lg overflow-hidden bg-surface">
         <li
           v-for="(m, idx) in relatedMeetings"
           :key="m.id"

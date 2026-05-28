@@ -3,9 +3,31 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Light — warm white + ink */
+    --c-ink:        15 27 45;     /* #0F1B2D — primary text / dark surfaces */
+    --c-terracotta: 198 93 62;    /* #C65D3E — accent */
+    --c-warm:       251 248 243;  /* #FBF8F3 — background / light surfaces */
+    --c-slate-warm: 74 85 104;    /* #4A5568 — secondary text */
+    --c-sand:       232 221 208;  /* #E8DDD0 — borders / dividers */
+    --c-surface:    255 252 247;  /* slightly brighter for elevated content */
+  }
+
+  .dark {
+    /* Warm dark — same palette feel, inverted brightness */
+    --c-ink:        232 221 208;  /* parchment cream */
+    --c-terracotta: 218 113 82;   /* a touch brighter so it still pops on dark */
+    --c-warm:       10 19 32;     /* deep ink #0A1320 */
+    --c-slate-warm: 156 163 175;
+    --c-sand:       40 53 74;     /* visible dark border on dark bg */
+    --c-surface:    22 33 51;     /* elevated surface — modals, cards */
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
+    color-scheme: light dark;
   }
+  html.dark { color-scheme: dark; }
   body {
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
@@ -37,11 +59,24 @@
   }
 
   .card {
-    @apply bg-warm border border-sand rounded-lg p-5;
+    @apply bg-surface border border-sand rounded-lg p-5;
   }
 
-  /* Alternating list rows: warm white / sand at 30% */
   .row-zebra > *:nth-child(even) {
-    background-color: rgba(232, 221, 208, 0.3);
+    background-color: rgb(var(--c-sand) / 0.3);
   }
+}
+
+/* ---- Route transitions ---- */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 180ms ease, transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }

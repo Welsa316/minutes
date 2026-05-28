@@ -4,6 +4,10 @@ import { useRouter } from 'vue-router';
 import { clients, projects, meetings } from '../api/endpoints.js';
 import { parseSmart, humanizeDate } from '../utils/dates.js';
 import { useToastStore } from '../stores/toast.js';
+import { useSettingsStore } from '../stores/settings.js';
+import { sounds } from '../utils/sounds.js';
+
+const settings = useSettingsStore();
 
 const router = useRouter();
 const toast = useToastStore();
@@ -27,6 +31,7 @@ const filteredProjects = computed(() => {
 
 async function show() {
   open.value = true;
+  if (settings.sound) sounds.whoosh();
   title.value = '';
   dateText.value = '';
   location.value = 'video';
@@ -88,7 +93,7 @@ defineExpose({ show, hide });
         <div class="absolute inset-0 bg-ink/40 backdrop-blur-sm" @click="hide" />
         <form
           @submit.prevent="submit"
-          class="relative w-full max-w-md bg-warm border border-sand rounded-xl shadow-2xl overflow-hidden"
+          class="relative w-full max-w-md bg-surface border border-sand rounded-xl shadow-2xl overflow-hidden"
         >
           <div class="px-4 pt-4 pb-2 flex items-center justify-between">
             <span class="text-[11px] uppercase tracking-wider text-slate-warm">New meeting</span>

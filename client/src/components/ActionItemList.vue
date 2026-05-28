@@ -2,6 +2,11 @@
 import { ref } from 'vue';
 import { actionItems as api } from '../api/endpoints.js';
 import { useToastStore } from '../stores/toast.js';
+import { useSettingsStore } from '../stores/settings.js';
+import { celebrate } from '../utils/confetti.js';
+import { sounds } from '../utils/sounds.js';
+
+const settings = useSettingsStore();
 
 const props = defineProps({
   meetingId: { type: [Number, String], required: true },
@@ -36,11 +41,27 @@ async function add() {
   }
 }
 
-async function toggle(item) {
+async function toggle(item, ev) {
   // Flip locally first.
   const optimistic = { ...item, done: !item.done };
-  emit('update:items', props.items.map((i) => (i.id === item.id ? optimistic : i)));
+  const next = props.items.map((i) => (i.id === item.id ? optimistic : i));
+  emit('update:items', next);
   mark(item.id, true);
+
+  if (settings.sound) sounds.pop();
+
+  // Were we one open item away from done? Celebrate if so.
+  if (!item.done) {
+    const stillOpen = next.filter((i) => !i.done).length;
+    if (stillOpen === 0 && props.items.length >= 1) {
+      const rect = ev?.target?.getBoundingClientRect?.();
+      const origin = rect
+        ? { x: (rect.left + rect.width / 2) / window.innerWidth, y: (rect.top + rect.height / 2) / window.innerHeight }
+        : { x: 0.5, y: 0.6 };
+      celebrate(origin);
+    }
+  }
+
   try {
     const real = await api.toggle(item.id);
     emit('update:items', props.items.map((i) => (i.id === item.id ? real : i)));
@@ -106,7 +127,7 @@ function ymd(d) {
         <input
           type="checkbox"
           :checked="i.done"
-          @change="toggle(i)"
+          @change="toggle(i, $event)"
           class="h-4 w-4 rounded border-sand text-terracotta focus:ring-terracotta/40"
         />
         <input

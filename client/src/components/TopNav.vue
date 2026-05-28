@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { search } from '../api/endpoints.js';
+import { useShortcut, isTyping } from '../composables/useShortcuts.js';
 
 const router = useRouter();
 const q = ref('');
@@ -9,7 +10,14 @@ const results = ref(null);
 const open = ref(false);
 const loading = ref(false);
 const wrapper = ref(null);
+const inputEl = ref(null);
 let debounce;
+
+// `/` focuses the search box
+useShortcut('/', (e) => {
+  e.preventDefault();
+  inputEl.value?.focus();
+});
 
 watch(q, (val) => {
   clearTimeout(debounce);
@@ -52,10 +60,11 @@ function fmtDate(d) {
   <header class="h-16 border-b border-sand bg-warm flex items-center px-6 lg:px-8 gap-4 sticky top-0 z-10">
     <div ref="wrapper" class="relative flex-1 max-w-xl">
       <input
+        ref="inputEl"
         v-model="q"
         @focus="results && (open = true)"
         type="search"
-        placeholder="Search meetings, clients, projects, notes…"
+        placeholder="Search meetings, clients, projects, notes…  (press /)"
         class="input pl-9"
       />
       <svg
@@ -68,7 +77,7 @@ function fmtDate(d) {
 
       <div
         v-if="open && results"
-        class="absolute left-0 right-0 mt-1 bg-warm border border-sand rounded-md shadow-lg max-h-[28rem] overflow-y-auto z-20"
+        class="absolute left-0 right-0 mt-1 bg-surface border border-sand rounded-md shadow-lg max-h-[28rem] overflow-y-auto z-20"
       >
         <p v-if="loading" class="px-3 py-2 text-sm text-slate-warm">Searching…</p>
         <template v-else-if="results.meetings.length || results.clients.length || results.projects.length || results.notes.length">

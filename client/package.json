@@ -10,6 +10,7 @@
     "generate:icons": "python3 generate-icons.py"
   },
   "dependencies": {
+    "@floating-ui/vue": "^1.1.11",
     "@tiptap/extension-link": "^2.10.3",
     "@tiptap/extension-mention": "^2.27.2",
     "@tiptap/extension-task-item": "^2.10.3",
@@ -19,6 +20,7 @@
     "@tiptap/vue-3": "^2.10.3",
     "@vueuse/core": "^14.3.0",
     "axios": "^1.7.9",
+    "canvas-confetti": "^1.9.4",
     "chrono-node": "^2.9.1",
     "date-fns": "^4.3.0",
     "pinia": "^2.3.0",

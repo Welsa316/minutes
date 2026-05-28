@@ -123,7 +123,7 @@ defineExpose({ show, hide });
         @mousedown.self="hide"
       >
         <div class="absolute inset-0 bg-ink/40 backdrop-blur-sm" @click="hide" />
-        <div class="relative w-full max-w-xl bg-warm border border-sand rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
+        <div class="relative w-full max-w-xl bg-surface border border-sand rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
           <div class="px-4 py-3 border-b border-sand flex items-center gap-3">
             <svg class="h-4 w-4 text-slate-warm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
             <input

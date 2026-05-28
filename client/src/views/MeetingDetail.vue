@@ -21,7 +21,11 @@ const allClients = ref([]);
 const allProjects = ref([]);
 const loading = ref(true);
 const saving = ref(false);
-const tab = ref('pre'); // pre | during | after
+const TABS = ['pre', 'during', 'after'];
+const tab = computed({
+  get: () => TABS.includes(route.query.tab) ? route.query.tab : 'pre',
+  set: (v) => router.replace({ query: { ...route.query, tab: v === 'pre' ? undefined : v } }),
+});
 
 const filteredProjects = computed(() => {
   if (!draft.value?.client_id) return allProjects.value;

@@ -101,7 +101,7 @@ onMounted(load);
       <form
         v-else
         @submit.prevent="save"
-        class="inline-flex items-center gap-1 bg-warm border border-sand rounded px-2 py-0.5"
+        class="inline-flex items-center gap-1 bg-surface border border-sand rounded px-2 py-0.5"
       >
         <input
           v-model="savingName"

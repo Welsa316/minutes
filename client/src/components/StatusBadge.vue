@@ -53,7 +53,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
     >{{ label(status) }}</span>
     <div
       v-if="editable && open"
-      class="absolute right-0 top-full mt-1 bg-warm border border-sand rounded-md shadow-lg z-20 py-1 min-w-[8rem]"
+      class="absolute right-0 top-full mt-1 bg-surface border border-sand rounded-md shadow-lg z-20 py-1 min-w-[8rem]"
     >
       <button
         v-for="opt in OPTIONS[variant]"

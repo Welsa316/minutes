@@ -2,6 +2,10 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, RouterLink } from 'vue-router';
 import { notes as api } from '../api/endpoints.js';
+import EmptyState from '../components/EmptyState.vue';
+import { useListNav } from '../composables/useListNav.js';
+
+const createInput = ref(null);
 
 const router = useRouter();
 const items = ref([]);
@@ -51,6 +55,12 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+const { selectedId } = useListNav({
+  items: computed(() => filtered.value),
+  pathFor: (n) => `/notes/${n.id}`,
+  createInput,
+});
+
 onMounted(load);
 </script>
 
@@ -63,8 +73,9 @@ onMounted(load);
 
     <form @submit.prevent="create" class="card flex items-center gap-3 py-2.5 px-4">
       <input
+        ref="createInput"
         v-model="newTitle"
-        placeholder="New note title…"
+        placeholder="New note title… (press c)"
         class="flex-1 bg-transparent focus:outline-none placeholder-slate-warm/60"
       />
       <button type="submit" :disabled="!newTitle.trim() || creating" class="btn-primary text-sm">Add</button>
@@ -81,7 +92,12 @@ onMounted(load);
     </div>
 
     <div v-if="loading" class="text-sm text-slate-warm">Loading…</div>
-    <div v-else-if="!filtered.length" class="text-sm text-slate-warm">No notes.</div>
+    <EmptyState
+      v-else-if="!filtered.length"
+      icon="✎"
+      title="No notes"
+      hint="Snippets, resources, brain-dumps. Anything that doesn't belong to a meeting."
+    />
     <ul v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
       <RouterLink
         v-for="n in filtered"
@@ -92,7 +108,7 @@ onMounted(load);
       >
       <li
         @click="navigate"
-        class="card cursor-pointer hover:border-slate-warm/40 transition-colors block"
+        :class="['card cursor-pointer hover:border-slate-warm/40 transition-colors block', selectedId === n.id && 'ring-1 ring-terracotta/40']"
       >
         <div class="font-medium text-ink truncate mb-1">{{ n.title }}</div>
         <p class="text-sm text-slate-warm line-clamp-3 mb-3">{{ stripHtml(n.body) || '—' }}</p>
