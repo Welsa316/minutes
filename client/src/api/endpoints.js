@@ -7,6 +7,8 @@ function crud(base) {
     create: (body) => api.post(base, body).then((r) => r.data),
     update: (id, body) => api.put(`${base}/${id}`, body).then((r) => r.data),
     remove: (id) => api.delete(`${base}/${id}`),
+    restore: (id) => api.post(`${base}/${id}/restore`).then((r) => r.data),
+    purge: (id) => api.delete(`${base}/${id}/permanent`),
   };
 }
 

@@ -13,25 +13,25 @@ router.get('/', async (req, res, next) => {
     const [c, p, m, n] = await Promise.all([
       query(
         `SELECT id, name, company FROM clients
-         WHERE name ILIKE $1 OR company ILIKE $1
+         WHERE deleted_at IS NULL AND (name ILIKE $1 OR company ILIKE $1)
          ORDER BY created_at DESC LIMIT 8`,
         [like],
       ),
       query(
         `SELECT id, name FROM projects
-         WHERE name ILIKE $1
+         WHERE deleted_at IS NULL AND name ILIKE $1
          ORDER BY created_at DESC LIMIT 8`,
         [like],
       ),
       query(
         `SELECT id, title, date FROM meetings
-         WHERE title ILIKE $1
+         WHERE deleted_at IS NULL AND title ILIKE $1
          ORDER BY date DESC NULLS LAST, created_at DESC LIMIT 8`,
         [like],
       ),
       query(
         `SELECT id, title FROM notes
-         WHERE title ILIKE $1
+         WHERE deleted_at IS NULL AND title ILIKE $1
          ORDER BY created_at DESC LIMIT 8`,
         [like],
       ),

@@ -7,20 +7,25 @@ import ActionItemList from '../components/ActionItemList.vue';
 import SmartDateInput from '../components/SmartDateInput.vue';
 import TagPicker from '../components/TagPicker.vue';
 import PinButton from '../components/PinButton.vue';
+import SaveStatus from '../components/SaveStatus.vue';
 import { useRecent } from '../composables/useRecent.js';
+import { useAutosave } from '../composables/useAutosave.js';
+import { useToastStore } from '../stores/toast.js';
+
 const recent = useRecent();
+const toast = useToastStore();
 
 const route = useRoute();
 const router = useRouter();
 
-const original = ref(null);
 const draft = ref(null);
+const original = ref(null);
 const dateLocal = ref('');
 const actionItems = ref([]);
 const allClients = ref([]);
 const allProjects = ref([]);
 const loading = ref(true);
-const saving = ref(false);
+
 const TABS = ['pre', 'during', 'after'];
 const tab = computed({
   get: () => TABS.includes(route.query.tab) ? route.query.tab : 'pre',
@@ -32,19 +37,25 @@ const filteredProjects = computed(() => {
   return allProjects.value.filter((p) => p.client_id === Number(draft.value.client_id) || p.id === draft.value.project_id);
 });
 
-const dirty = computed(() => {
-  if (!original.value || !draft.value) return false;
-  const dateIso = dateLocal.value ? new Date(dateLocal.value).toISOString() : null;
-  const cur = { ...draft.value, date: dateIso };
-  const orig = { ...original.value };
-  // Strip joined fields that aren't part of the editable record
-  delete orig.client_name;
-  delete orig.project_name;
-  delete orig.action_items;
-  return JSON.stringify(orig) !== JSON.stringify(cur);
-});
-
 const openActionItems = computed(() => actionItems.value.filter((i) => !i.done).length);
+
+const autosave = useAutosave({
+  data: draft,
+  key: () => `meeting:${route.params.id}`,
+  async save(snapshot) {
+    const body = { ...snapshot };
+    body.date = dateLocal.value ? new Date(dateLocal.value).toISOString() : null;
+    delete body.client_name;
+    delete body.project_name;
+    delete body.action_items;
+    delete body.tags;
+    delete body.created_at;
+    const updated = await meetings.update(route.params.id, body);
+    original.value = updated;
+    // Important: don't slam draft.value here — that would clobber whatever the
+    // user has typed since the request started. We trust the autosave flow.
+  },
+});
 
 async function load() {
   loading.value = true;
@@ -56,38 +67,61 @@ async function load() {
   ]);
   const { action_items, ...rest } = m;
   original.value = rest;
-  draft.value = { ...rest };
-  delete draft.value.client_name;
-  delete draft.value.project_name;
-  delete draft.value.action_items;
+
+  // If there's a localStorage draft newer than the server's updated_at, offer to restore.
+  const stash = autosave.pickupDraft();
+  if (stash?.payload && (Date.now() - stash.ts) < 24 * 60 * 60 * 1000) {
+    // Only restore if the stash is meaningfully different from the server copy.
+    const stashStr = JSON.stringify({ ...stash.payload, action_items: undefined, tags: undefined, client_name: undefined, project_name: undefined });
+    const serverStr = JSON.stringify({ ...rest, action_items: undefined, tags: undefined, client_name: undefined, project_name: undefined });
+    if (stashStr !== serverStr) {
+      const ok = confirm(`You have unsaved local edits from ${new Date(stash.ts).toLocaleString()}.\n\nRestore them? (Cancel = discard local copy and use the saved version)`);
+      if (ok) {
+        draft.value = { ...rest, ...stash.payload };
+      } else {
+        draft.value = { ...rest };
+        autosave.clearDraft();
+      }
+    } else {
+      draft.value = { ...rest };
+      autosave.clearDraft();
+    }
+  } else {
+    draft.value = { ...rest };
+  }
+
   dateLocal.value = m.date ? toLocalInput(m.date) : '';
   actionItems.value = action_items || [];
   allClients.value = c;
   allProjects.value = p;
   loading.value = false;
+  autosave.seed();
   recent.visit({ kind: 'meeting', id: m.id, title: m.title });
 }
 
-async function save() {
-  saving.value = true;
-  try {
-    const body = { ...draft.value };
-    body.date = dateLocal.value ? new Date(dateLocal.value).toISOString() : null;
-    delete body.client_name;
-    delete body.project_name;
-    delete body.action_items;
-    const updated = await meetings.update(route.params.id, body);
-    original.value = updated;
-    draft.value = { ...updated };
-    dateLocal.value = updated.date ? toLocalInput(updated.date) : '';
-  } finally {
-    saving.value = false;
-  }
-}
+// Treat the date input as "dirty" too — kick the autosave when it changes.
+watch(dateLocal, () => {
+  if (!draft.value) return;
+  // Touch a sentinel field to force the deep watcher to fire.
+  draft.value._dateBump = (draft.value._dateBump || 0) + 1;
+});
 
 async function destroy() {
-  if (!confirm(`Delete "${original.value.title}"? This cannot be undone.`)) return;
+  const meetingTitle = original.value.title;
   await meetings.remove(route.params.id);
+  toast.show(`Deleted "${meetingTitle}"`, {
+    kind: 'info',
+    ttl: 6000,
+    action: {
+      label: 'Undo',
+      run: async () => {
+        await meetings.restore(route.params.id);
+        toast.success('Restored');
+        // Reload data in case user is still here. If we left already, no-op.
+        if (route.params.id) load();
+      },
+    },
+  });
   router.replace('/meetings');
 }
 
@@ -112,11 +146,9 @@ watch(() => route.params.id, load);
     <header class="flex items-center gap-4">
       <RouterLink to="/meetings" class="text-sm text-slate-warm hover:text-ink">&larr; Meetings</RouterLink>
       <div class="flex-1" />
+      <SaveStatus :status="autosave.status.value" :last-saved-at="autosave.lastSavedAt.value" />
       <PinButton entity-type="meeting" :entity-id="route.params.id" />
       <button @click="destroy" class="text-sm text-slate-warm hover:text-terracotta">Delete</button>
-      <button @click="save" :disabled="!dirty || saving" class="btn-primary text-sm">
-        {{ saving ? 'Saving…' : dirty ? 'Save' : 'Saved' }}
-      </button>
     </header>
 
     <input

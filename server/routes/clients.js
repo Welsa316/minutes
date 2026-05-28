@@ -5,9 +5,10 @@ const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { status, tag } = req.query;
+    const { status, tag, trash } = req.query;
     const params = [];
     const conds = [];
+    conds.push(trash === 'true' ? 'c.deleted_at IS NOT NULL' : 'c.deleted_at IS NULL');
     if (status) { params.push(status); conds.push(`c.status = $${params.length}`); }
     if (tag) {
       params.push(tag);
@@ -15,7 +16,7 @@ router.get('/', async (req, res, next) => {
                           JOIN tags t2 ON t2.id = et2.tag_id
                           WHERE et2.entity_type='client' AND et2.entity_id=c.id AND t2.name=$${params.length})`);
     }
-    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const where = `WHERE ${conds.join(' AND ')}`;
     const { rows } = await query(
       `SELECT c.*,
               COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS tags
@@ -81,7 +82,30 @@ router.put('/:id', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Soft delete — sets deleted_at. Restore via POST /:id/restore.
 router.delete('/:id', async (req, res, next) => {
+  try {
+    const r = await query(
+      'UPDATE clients SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
+      [req.params.id],
+    );
+    if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
+    res.status(204).end();
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/restore', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      'UPDATE clients SET deleted_at = NULL WHERE id = $1 RETURNING *',
+      [req.params.id],
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'not found' });
+    res.json(rows[0]);
+  } catch (e) { next(e); }
+});
+
+router.delete('/:id/permanent', async (req, res, next) => {
   try {
     const r = await query('DELETE FROM clients WHERE id = $1', [req.params.id]);
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });

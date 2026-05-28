@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, RouterLink } from 'vue-router';
 import { notes as api } from '../api/endpoints.js';
 import EmptyState from '../components/EmptyState.vue';
+import Skeleton from '../components/Skeleton.vue';
 import { useListNav } from '../composables/useListNav.js';
 
 const createInput = ref(null);
@@ -91,14 +92,14 @@ onMounted(load);
       >#{{ t }}</button>
     </div>
 
-    <div v-if="loading" class="text-sm text-slate-warm">Loading…</div>
+    <Skeleton v-if="loading" variant="cards" :rows="4" />
     <EmptyState
       v-else-if="!filtered.length"
       icon="✎"
       title="No notes"
       hint="Snippets, resources, brain-dumps. Anything that doesn't belong to a meeting."
     />
-    <ul v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <ul v-else class="grid grid-cols-1 md:grid-cols-2 gap-3 stagger">
       <RouterLink
         v-for="n in filtered"
         :key="n.id"

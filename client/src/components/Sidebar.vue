@@ -113,6 +113,11 @@ watch(() => route.fullPath, loadPinned);
         <button class="btn-ghost flex-1 text-sm" @click="$emit('logout')">Sign out</button>
         <button
           class="btn-ghost px-2 text-sm"
+          @click="settings.toggleDensity"
+          :title="`Density: ${settings.density}`"
+        >{{ settings.density === 'compact' ? '≡' : '☰' }}</button>
+        <button
+          class="btn-ghost px-2 text-sm"
           @click="settings.sound = !settings.sound"
           :title="settings.sound ? 'Sound on' : 'Sound off'"
         >{{ settings.sound ? '♪' : '·' }}</button>

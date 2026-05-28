@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -10,8 +10,12 @@ import ClientChip from '../components/ClientChip.vue';
 import TagChip from '../components/TagChip.vue';
 import SavedViewsBar from '../components/SavedViewsBar.vue';
 import EmptyState from '../components/EmptyState.vue';
+import Skeleton from '../components/Skeleton.vue';
+import BulkActionBar from '../components/BulkActionBar.vue';
 import { clientColor } from '../utils/colors.js';
 import { useListNav } from '../composables/useListNav.js';
+import { useMultiSelect } from '../composables/useMultiSelect.js';
+import { useToastStore } from '../stores/toast.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -81,6 +85,42 @@ const { selectedId } = useListNav({
   pathFor: (m) => `/meetings/${m.id}`,
 });
 
+const toast = useToastStore();
+const sel = useMultiSelect(computed(() => filtered.value));
+
+async function bulkArchive() {
+  const ids = [...sel.selected.value];
+  const snapshot = items.value;
+  // Optimistic remove from local list
+  items.value = items.value.filter((m) => !sel.selected.value.has(m.id));
+  sel.clear();
+  try {
+    await Promise.all(ids.map((id) => api.remove(id)));
+    toast.show(`Archived ${ids.length} meeting${ids.length === 1 ? '' : 's'}`, {
+      ttl: 6000,
+      action: {
+        label: 'Undo',
+        run: async () => {
+          await Promise.all(ids.map((id) => api.restore(id)));
+          toast.success('Restored');
+          load();
+        },
+      },
+    });
+  } catch {
+    items.value = snapshot;
+    toast.error('Failed to archive');
+  }
+}
+
+function onKey(e) {
+  if (e.key === 'Escape' && sel.hasSelection.value) {
+    sel.clear();
+  }
+}
+onMounted(() => document.addEventListener('keydown', onKey));
+onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
+
 watch(view, (v) => {
   router.replace({ query: { ...route.query, view: v === 'calendar' ? 'calendar' : undefined } });
 });
@@ -112,7 +152,7 @@ onMounted(load);
         <SavedViewsBar section="meetings" :filter-keys="['filter', 'tag']" />
       </div>
 
-      <div v-if="loading" class="text-sm text-slate-warm">Loading…</div>
+      <Skeleton v-if="loading" :rows="5" />
       <EmptyState
         v-else-if="!filtered.length"
         icon="◷"
@@ -120,7 +160,7 @@ onMounted(load);
         hint="Track every conversation. Prep, capture, then close out with action items."
         shortcut="⌘N"
       />
-      <ul v-else class="border border-sand rounded-lg overflow-hidden bg-surface">
+      <ul v-else class="border border-sand rounded-lg overflow-hidden bg-surface stagger">
         <RouterLink
           v-for="(m, idx) in filtered"
           :key="m.id"
@@ -129,10 +169,16 @@ onMounted(load);
           v-slot="{ navigate }"
         >
         <li
-          @click="navigate"
-          :class="['relative pl-4 pr-4 py-3 hover:bg-sand/40 cursor-pointer flex items-center gap-4', idx > 0 && 'border-t border-sand/60', selectedId === m.id && 'bg-sand/30 ring-1 ring-inset ring-terracotta/30']"
+          @click="(e) => (e.shiftKey || e.metaKey || e.ctrlKey || sel.hasSelection.value) ? sel.toggle(m.id, e) : navigate(e)"
+          :class="['group relative pl-4 pr-4 py-3 hover:bg-sand/40 cursor-pointer flex items-center gap-4', idx > 0 && 'border-t border-sand/60', selectedId === m.id && 'bg-sand/30 ring-1 ring-inset ring-terracotta/30', sel.isSelected(m.id) && 'bg-terracotta/10']"
         >
           <span v-if="m.client_name" aria-hidden class="absolute left-0 top-0 bottom-0 w-1" :style="{ background: clientColor(m.client_name).bg }" />
+          <input
+            type="checkbox"
+            :checked="sel.isSelected(m.id)"
+            @click.stop="sel.toggle(m.id, $event)"
+            :class="['h-4 w-4 rounded border-sand text-terracotta focus:ring-terracotta/40 transition-opacity', sel.hasSelection.value ? 'opacity-100' : 'opacity-0 group-hover:opacity-50 hover:!opacity-100']"
+          />
           <div class="flex-1 min-w-0">
             <div class="font-medium text-ink truncate">{{ m.title }}</div>
             <div class="flex items-center gap-2 flex-wrap text-sm text-slate-warm">
@@ -149,6 +195,12 @@ onMounted(load);
         </li>
         </RouterLink>
       </ul>
+
+      <BulkActionBar
+        :count="sel.count.value"
+        :actions="[{ label: 'Archive', icon: '🗑', kind: 'danger', run: bulkArchive }]"
+        @clear="sel.clear()"
+      />
     </template>
 
     <!-- Calendar view -->

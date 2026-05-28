@@ -1,7 +1,7 @@
 <script setup>
-import { watch, onBeforeUnmount } from 'vue';
+import { ref, watch, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
-import { useEditor, EditorContent } from '@tiptap/vue-3';
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
@@ -9,6 +9,7 @@ import Link from '@tiptap/extension-link';
 import Mention from '@tiptap/extension-mention';
 import 'tippy.js/dist/tippy.css';
 import { mentionSuggestion, SlashCommand } from '../composables/tiptapSuggestions.js';
+import { Callout } from '../composables/calloutNode.js';
 
 const router = useRouter();
 
@@ -48,6 +49,7 @@ const editor = useEditor({
       },
     }),
     SlashCommand,
+    Callout,
   ],
   editorProps: {
     attributes: { class: 'tp-prose focus:outline-none' },
@@ -114,9 +116,20 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
       <button type="button" class="tp-btn" :class="isActive('taskList') && 'tp-btn-active'" @click="run(c => c.toggleTaskList())" title="Checklist">&#9744;</button>
       <span class="mx-1 w-px h-4 bg-sand" />
       <button type="button" class="tp-btn" :class="isActive('link') && 'tp-btn-active'" @click="setLink" title="Link">link</button>
+      <button type="button" class="tp-btn" :class="isActive('blockquote') && 'tp-btn-active'" @click="run(c => c.toggleBlockquote())" title="Quote">&ldquo;</button>
+      <button type="button" class="tp-btn" :class="isActive('callout', { tone: 'info' }) && 'tp-btn-active'" @click="run(c => c.toggleCallout({ tone: 'info' }))" title="Callout / key decision">!</button>
+      <button type="button" class="tp-btn" :class="isActive('callout', { tone: 'next' }) && 'tp-btn-active'" @click="run(c => c.toggleCallout({ tone: 'next' }))" title="Callout / follow-up">→</button>
+      <span class="mx-1 w-px h-4 bg-sand" />
       <button type="button" class="tp-btn" @click="run(c => c.undo())" title="Undo">&#8630;</button>
       <button type="button" class="tp-btn" @click="run(c => c.redo())" title="Redo">&#8631;</button>
     </div>
+    <BubbleMenu v-if="editor" :editor="editor" :tippy-options="{ duration: 120 }" class="flex items-center gap-0.5 bg-surface border border-sand rounded-md shadow-lg px-1 py-1">
+      <button type="button" class="tp-btn" :class="isActive('bold') && 'tp-btn-active'" @click="run(c => c.toggleBold())"><span class="font-bold">B</span></button>
+      <button type="button" class="tp-btn" :class="isActive('italic') && 'tp-btn-active'" @click="run(c => c.toggleItalic())"><span class="italic">i</span></button>
+      <button type="button" class="tp-btn" :class="isActive('strike') && 'tp-btn-active'" @click="run(c => c.toggleStrike())"><span class="line-through">S</span></button>
+      <button type="button" class="tp-btn" :class="isActive('code') && 'tp-btn-active'" @click="run(c => c.toggleCode())" title="Code"><span class="font-mono text-xs">{}</span></button>
+      <button type="button" class="tp-btn" :class="isActive('link') && 'tp-btn-active'" @click="setLink">link</button>
+    </BubbleMenu>
     <EditorContent :editor="editor" class="px-3 py-2.5" :style="{ minHeight }" />
   </div>
 </template>
@@ -147,6 +160,23 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
 .tp-prose code { background: theme('colors.sand'); padding: 0.125rem 0.25rem; border-radius: 0.25rem; font-size: 0.875em; }
 .tp-prose pre { background: theme('colors.ink'); color: theme('colors.warm'); padding: 0.75rem; border-radius: 0.375rem; overflow-x: auto; }
 .tp-prose pre code { background: transparent; padding: 0; color: inherit; }
+
+/* Callout boxes */
+.tp-prose .callout {
+  border-left: 3px solid;
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  margin: 0.5rem 0;
+  background: rgb(var(--c-sand) / 0.4);
+}
+.tp-prose .callout[data-tone="info"]  { border-color: theme('colors.terracotta'); background: rgb(var(--c-terracotta) / 0.08); }
+.tp-prose .callout[data-tone="warn"]  { border-color: #C29A3A; background: rgba(194, 154, 58, 0.08); }
+.tp-prose .callout[data-tone="next"]  { border-color: #3F6B4C; background: rgba(63, 107, 76, 0.08); }
+.tp-prose .callout[data-tone="info"]::before  { content: '! '; color: theme('colors.terracotta'); font-weight: 600; }
+.tp-prose .callout[data-tone="warn"]::before  { content: '? '; color: #C29A3A; font-weight: 600; }
+.tp-prose .callout[data-tone="next"]::before  { content: '→ '; color: #3F6B4C; font-weight: 600; }
+.tp-prose .callout > :first-child { display: inline; }
+.tp-prose .callout > * { margin: 0; }
 .tp-prose .mention {
   background: theme('colors.sand');
   color: theme('colors.ink');

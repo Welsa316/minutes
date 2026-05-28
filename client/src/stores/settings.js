@@ -9,9 +9,10 @@ function load() {
     return {
       theme: raw.theme || 'system',
       sound: raw.sound ?? false,
+      density: raw.density || 'comfortable',
     };
   } catch {
-    return { theme: 'system', sound: false };
+    return { theme: 'system', sound: false, density: 'comfortable' };
   }
 }
 
@@ -19,6 +20,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const initial = load();
   const theme = ref(initial.theme);   // 'light' | 'dark' | 'system'
   const sound = ref(initial.sound);
+  const density = ref(initial.density); // 'comfortable' | 'compact'
 
   function applyTheme() {
     const sys = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -26,13 +28,22 @@ export const useSettingsStore = defineStore('settings', () => {
     document.documentElement.classList.toggle('dark', dark);
   }
 
+  function applyDensity() {
+    document.documentElement.setAttribute('data-density', density.value);
+  }
+
   function cycleTheme() {
     theme.value = theme.value === 'light' ? 'dark' : theme.value === 'dark' ? 'system' : 'light';
   }
 
-  watch([theme, sound], () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ theme: theme.value, sound: sound.value }));
+  function toggleDensity() {
+    density.value = density.value === 'comfortable' ? 'compact' : 'comfortable';
+  }
+
+  watch([theme, sound, density], () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ theme: theme.value, sound: sound.value, density: density.value }));
     applyTheme();
+    applyDensity();
   });
 
   // Re-apply when the system color scheme changes
@@ -41,6 +52,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   applyTheme();
+  applyDensity();
 
-  return { theme, sound, applyTheme, cycleTheme };
+  return { theme, sound, density, applyTheme, applyDensity, cycleTheme, toggleDensity };
 });

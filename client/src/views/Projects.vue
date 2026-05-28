@@ -7,6 +7,7 @@ import StatusBadge from '../components/StatusBadge.vue';
 import ClientChip from '../components/ClientChip.vue';
 import TagChip from '../components/TagChip.vue';
 import EmptyState from '../components/EmptyState.vue';
+import Skeleton from '../components/Skeleton.vue';
 import { useToastStore } from '../stores/toast.js';
 import { clientColor } from '../utils/colors.js';
 import { useListNav } from '../composables/useListNav.js';
@@ -128,10 +129,10 @@ onMounted(load);
       <button type="submit" :disabled="!newName.trim() || creating" class="btn-primary text-sm">Add</button>
     </form>
 
-    <div v-if="loading" class="text-sm text-slate-warm">Loading…</div>
+    <Skeleton v-if="loading" :rows="5" />
 
     <!-- List view -->
-    <ul v-else-if="view === 'list' && items.length" class="border border-sand rounded-lg overflow-hidden bg-surface">
+    <ul v-else-if="view === 'list' && items.length" class="border border-sand rounded-lg overflow-hidden bg-surface stagger">
       <li
         v-for="(p, idx) in items"
         :key="p.id"

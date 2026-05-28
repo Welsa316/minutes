@@ -5,9 +5,9 @@ const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { status, client_id, tag } = req.query;
+    const { status, client_id, tag, trash } = req.query;
     const params = [];
-    const conds = [];
+    const conds = [trash === 'true' ? 'p.deleted_at IS NOT NULL' : 'p.deleted_at IS NULL'];
     if (status) { params.push(status); conds.push(`p.status = $${params.length}`); }
     if (client_id) { params.push(client_id); conds.push(`p.client_id = $${params.length}`); }
     if (tag) {
@@ -15,7 +15,7 @@ router.get('/', async (req, res, next) => {
       conds.push(`EXISTS (SELECT 1 FROM entity_tags et2 JOIN tags t2 ON t2.id=et2.tag_id
                           WHERE et2.entity_type='project' AND et2.entity_id=p.id AND t2.name=$${params.length})`);
     }
-    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const where = `WHERE ${conds.join(' AND ')}`;
     const { rows } = await query(
       `SELECT p.*, c.name AS client_name,
               COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS tags
@@ -83,6 +83,28 @@ router.put('/:id', async (req, res, next) => {
 });
 
 router.delete('/:id', async (req, res, next) => {
+  try {
+    const r = await query(
+      'UPDATE projects SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
+      [req.params.id],
+    );
+    if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
+    res.status(204).end();
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/restore', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      'UPDATE projects SET deleted_at = NULL WHERE id = $1 RETURNING *',
+      [req.params.id],
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'not found' });
+    res.json(rows[0]);
+  } catch (e) { next(e); }
+});
+
+router.delete('/:id/permanent', async (req, res, next) => {
   try {
     const r = await query('DELETE FROM projects WHERE id = $1', [req.params.id]);
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });

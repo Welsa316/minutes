@@ -1,17 +1,28 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { clients as api } from '../api/endpoints.js';
+import { clients as api, meetings as mApi } from '../api/endpoints.js';
 import StatusBadge from '../components/StatusBadge.vue';
 import ClientChip from '../components/ClientChip.vue';
 import TagChip from '../components/TagChip.vue';
 import EmptyState from '../components/EmptyState.vue';
+import Skeleton from '../components/Skeleton.vue';
+import Sparkline from '../components/Sparkline.vue';
 import { clientColor } from '../utils/colors.js';
 import { useToastStore } from '../stores/toast.js';
 import { useListNav } from '../composables/useListNav.js';
 
 const toast = useToastStore();
 const createInput = ref(null);
+const allMeetings = ref([]);
+const datesByClient = computed(() => {
+  const m = {};
+  for (const x of allMeetings.value) {
+    if (!x.client_id || !x.date) continue;
+    (m[x.client_id] ||= []).push(x.date);
+  }
+  return m;
+});
 
 async function setStatus(client, status) {
   const prev = client.status;
@@ -28,7 +39,9 @@ const creating = ref(false);
 
 async function load() {
   loading.value = true;
-  items.value = await api.list();
+  const [c, mm] = await Promise.all([api.list(), mApi.list()]);
+  items.value = c;
+  allMeetings.value = mm;
   loading.value = false;
 }
 
@@ -71,14 +84,14 @@ onMounted(load);
       <button type="submit" :disabled="!newName.trim() || creating" class="btn-primary text-sm">Add</button>
     </form>
 
-    <div v-if="loading" class="text-sm text-slate-warm">Loading…</div>
+    <Skeleton v-if="loading" :rows="5" />
     <EmptyState
       v-else-if="!items.length"
       icon="◉"
       title="No clients yet"
       hint="Add the people and companies you're working with."
     />
-    <ul v-else class="border border-sand rounded-lg overflow-hidden bg-surface">
+    <ul v-else class="border border-sand rounded-lg overflow-hidden bg-surface stagger">
       <li
         v-for="(c, idx) in items"
         :key="c.id"
@@ -98,6 +111,13 @@ onMounted(load);
             <TagChip v-for="t in c.tags" :key="t" :tag="t" size="xs" />
           </div>
         </div>
+        <Sparkline
+          v-if="(datesByClient[c.id] || []).length"
+          :dates="datesByClient[c.id] || []"
+          :width="60"
+          :height="18"
+          :color="clientColor(c.name).bg"
+        />
         <span v-if="c.source" class="text-xs text-slate-warm capitalize">{{ c.source }}</span>
         <StatusBadge :status="c.status" variant="client" editable @change="setStatus(c, $event)" />
       </li>

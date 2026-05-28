@@ -6,8 +6,12 @@ import StatusBadge from '../components/StatusBadge.vue';
 import SmartDateInput from '../components/SmartDateInput.vue';
 import TagPicker from '../components/TagPicker.vue';
 import PinButton from '../components/PinButton.vue';
+import SaveStatus from '../components/SaveStatus.vue';
 import { useRecent } from '../composables/useRecent.js';
+import { useAutosave } from '../composables/useAutosave.js';
+import { useToastStore } from '../stores/toast.js';
 const recent = useRecent();
+const toast = useToastStore();
 
 const route = useRoute();
 const router = useRouter();
@@ -18,15 +22,23 @@ const budgetInput = ref('');
 const clientOptions = ref([]);
 const relatedMeetings = ref([]);
 const loading = ref(true);
-const saving = ref(false);
 
-const dirty = computed(() => {
-  if (!original.value || !draft.value) return false;
-  const cents = budgetInput.value ? Math.round(Number(budgetInput.value) * 100) : null;
-  return (
-    JSON.stringify({ ...original.value, budget_cents: original.value.budget_cents }) !==
-    JSON.stringify({ ...draft.value, budget_cents: cents })
-  );
+const autosave = useAutosave({
+  data: draft,
+  key: () => `project:${route.params.id}`,
+  async save(snapshot) {
+    const body = { ...snapshot };
+    body.budget_cents = budgetInput.value ? Math.round(Number(budgetInput.value) * 100) : null;
+    if (body.deadline === '') body.deadline = null;
+    delete body.client_name; delete body.tags; delete body.created_at;
+    const updated = await projects.update(route.params.id, body);
+    original.value = updated;
+  },
+});
+
+watch(budgetInput, () => {
+  if (!draft.value) return;
+  draft.value._budgetBump = (draft.value._budgetBump || 0) + 1;
 });
 
 async function load() {
@@ -38,32 +50,34 @@ async function load() {
     meetings.list({ project_id: id }),
   ]);
   original.value = p;
-  draft.value = { ...p };
+  const stash = autosave.pickupDraft();
+  if (stash?.payload && (Date.now() - stash.ts) < 24 * 60 * 60 * 1000) {
+    const stashStr = JSON.stringify({ ...stash.payload, tags: undefined, client_name: undefined });
+    const serverStr = JSON.stringify({ ...p, tags: undefined, client_name: undefined });
+    if (stashStr !== serverStr && confirm(`Unsaved local edits from ${new Date(stash.ts).toLocaleString()}. Restore?`)) {
+      draft.value = { ...p, ...stash.payload };
+    } else {
+      draft.value = { ...p };
+      autosave.clearDraft();
+    }
+  } else {
+    draft.value = { ...p };
+  }
   budgetInput.value = p.budget_cents != null ? (p.budget_cents / 100).toString() : '';
   clientOptions.value = c;
   relatedMeetings.value = m;
   loading.value = false;
+  autosave.seed();
   recent.visit({ kind: 'project', id: p.id, title: p.name });
 }
 
-async function save() {
-  saving.value = true;
-  try {
-    const body = { ...draft.value };
-    body.budget_cents = budgetInput.value ? Math.round(Number(budgetInput.value) * 100) : null;
-    if (body.deadline === '') body.deadline = null;
-    const updated = await projects.update(route.params.id, body);
-    original.value = updated;
-    draft.value = { ...updated };
-    budgetInput.value = updated.budget_cents != null ? (updated.budget_cents / 100).toString() : '';
-  } finally {
-    saving.value = false;
-  }
-}
-
 async function destroy() {
-  if (!confirm(`Delete ${original.value.name}? This cannot be undone.`)) return;
+  const name = original.value.name;
   await projects.remove(route.params.id);
+  toast.show(`Deleted ${name}`, {
+    kind: 'info', ttl: 6000,
+    action: { label: 'Undo', run: async () => { await projects.restore(route.params.id); toast.success('Restored'); load(); } },
+  });
   router.replace('/projects');
 }
 
@@ -87,11 +101,9 @@ watch(() => route.params.id, load);
     <header class="flex items-center gap-4">
       <RouterLink to="/projects" class="text-sm text-slate-warm hover:text-ink">&larr; Projects</RouterLink>
       <div class="flex-1" />
+      <SaveStatus :status="autosave.status.value" :last-saved-at="autosave.lastSavedAt.value" />
       <PinButton entity-type="project" :entity-id="route.params.id" />
       <button @click="destroy" class="text-sm text-slate-warm hover:text-terracotta">Delete</button>
-      <button @click="save" :disabled="!dirty || saving" class="btn-primary text-sm">
-        {{ saving ? 'Saving…' : dirty ? 'Save' : 'Saved' }}
-      </button>
     </header>
 
     <div class="space-y-4">

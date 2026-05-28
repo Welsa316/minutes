@@ -5,9 +5,9 @@ const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { client_id, project_id, upcoming, tag, from, to } = req.query;
+    const { client_id, project_id, upcoming, tag, from, to, trash } = req.query;
     const params = [];
-    const conds = [];
+    const conds = [trash === 'true' ? 'm.deleted_at IS NOT NULL' : 'm.deleted_at IS NULL'];
     if (client_id) { params.push(client_id); conds.push(`m.client_id = $${params.length}`); }
     if (project_id) { params.push(project_id); conds.push(`m.project_id = $${params.length}`); }
     if (upcoming === 'true') { conds.push(`m.date >= NOW()`); }
@@ -18,7 +18,7 @@ router.get('/', async (req, res, next) => {
       conds.push(`EXISTS (SELECT 1 FROM entity_tags et2 JOIN tags t2 ON t2.id=et2.tag_id
                           WHERE et2.entity_type='meeting' AND et2.entity_id=m.id AND t2.name=$${params.length})`);
     }
-    const clause = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const clause = `WHERE ${conds.join(' AND ')}`;
     const order = upcoming === 'true' ? 'ORDER BY m.date ASC' : 'ORDER BY m.date DESC NULLS LAST, m.created_at DESC';
     const { rows } = await query(
       `SELECT m.*,
@@ -57,7 +57,7 @@ router.get('/:id', async (req, res, next) => {
     );
     if (!mrows[0]) return res.status(404).json({ error: 'not found' });
     const { rows: actionItems } = await query(
-      'SELECT * FROM action_items WHERE meeting_id = $1 ORDER BY created_at ASC',
+      'SELECT * FROM action_items WHERE meeting_id = $1 AND deleted_at IS NULL ORDER BY created_at ASC',
       [req.params.id],
     );
     res.json({ ...mrows[0], action_items: actionItems });
@@ -108,6 +108,28 @@ router.put('/:id', async (req, res, next) => {
 });
 
 router.delete('/:id', async (req, res, next) => {
+  try {
+    const r = await query(
+      'UPDATE meetings SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
+      [req.params.id],
+    );
+    if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
+    res.status(204).end();
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/restore', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      'UPDATE meetings SET deleted_at = NULL WHERE id = $1 RETURNING *',
+      [req.params.id],
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'not found' });
+    res.json(rows[0]);
+  } catch (e) { next(e); }
+});
+
+router.delete('/:id/permanent', async (req, res, next) => {
   try {
     const r = await query('DELETE FROM meetings WHERE id = $1', [req.params.id]);
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });

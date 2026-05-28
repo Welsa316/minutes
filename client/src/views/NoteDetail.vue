@@ -1,60 +1,64 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
 import { notes } from '../api/endpoints.js';
 import TiptapEditor from '../components/TiptapEditor.vue';
 import TagPicker from '../components/TagPicker.vue';
 import PinButton from '../components/PinButton.vue';
+import SaveStatus from '../components/SaveStatus.vue';
 import { useRecent } from '../composables/useRecent.js';
-const recent = useRecent();
+import { useAutosave } from '../composables/useAutosave.js';
+import { useToastStore } from '../stores/toast.js';
 
+const recent = useRecent();
+const toast = useToastStore();
 const route = useRoute();
 const router = useRouter();
 
 const original = ref(null);
 const draft = ref(null);
-const tagsInput = ref('');
 const loading = ref(true);
-const saving = ref(false);
 
-const tagsArray = computed(() =>
-  tagsInput.value
-    .split(',')
-    .map((t) => t.trim().replace(/^#/, ''))
-    .filter(Boolean)
-);
-
-const dirty = computed(() => {
-  if (!original.value || !draft.value) return false;
-  const cur = { ...draft.value, tags: tagsArray.value };
-  return JSON.stringify(original.value) !== JSON.stringify(cur);
+const autosave = useAutosave({
+  data: draft,
+  key: () => `note:${route.params.id}`,
+  async save(snapshot) {
+    const body = { ...snapshot };
+    delete body.universal_tags; delete body.created_at;
+    const updated = await notes.update(route.params.id, body);
+    original.value = updated;
+  },
 });
 
 async function load() {
   loading.value = true;
   const n = await notes.get(route.params.id);
   original.value = n;
-  draft.value = { ...n };
-  tagsInput.value = (n.tags || []).join(', ');
+  const stash = autosave.pickupDraft();
+  if (stash?.payload && (Date.now() - stash.ts) < 24 * 60 * 60 * 1000) {
+    const stashStr = JSON.stringify({ ...stash.payload, universal_tags: undefined });
+    const serverStr = JSON.stringify({ ...n, universal_tags: undefined });
+    if (stashStr !== serverStr && confirm(`Unsaved local edits from ${new Date(stash.ts).toLocaleString()}. Restore?`)) {
+      draft.value = { ...n, ...stash.payload };
+    } else {
+      draft.value = { ...n };
+      autosave.clearDraft();
+    }
+  } else {
+    draft.value = { ...n };
+  }
   loading.value = false;
+  autosave.seed();
   recent.visit({ kind: 'note', id: n.id, title: n.title });
 }
 
-async function save() {
-  saving.value = true;
-  try {
-    const updated = await notes.update(route.params.id, { ...draft.value, tags: tagsArray.value });
-    original.value = updated;
-    draft.value = { ...updated };
-    tagsInput.value = (updated.tags || []).join(', ');
-  } finally {
-    saving.value = false;
-  }
-}
-
 async function destroy() {
-  if (!confirm(`Delete "${original.value.title}"? This cannot be undone.`)) return;
+  const title = original.value.title;
   await notes.remove(route.params.id);
+  toast.show(`Deleted "${title}"`, {
+    kind: 'info', ttl: 6000,
+    action: { label: 'Undo', run: async () => { await notes.restore(route.params.id); toast.success('Restored'); load(); } },
+  });
   router.replace('/notes');
 }
 
@@ -72,11 +76,9 @@ watch(() => route.params.id, load);
     <header class="flex items-center gap-4">
       <RouterLink to="/notes" class="text-sm text-slate-warm hover:text-ink">&larr; Notes</RouterLink>
       <div class="flex-1" />
+      <SaveStatus :status="autosave.status.value" :last-saved-at="autosave.lastSavedAt.value" />
       <PinButton entity-type="note" :entity-id="route.params.id" />
       <button @click="destroy" class="text-sm text-slate-warm hover:text-terracotta">Delete</button>
-      <button @click="save" :disabled="!dirty || saving" class="btn-primary text-sm">
-        {{ saving ? 'Saving…' : dirty ? 'Save' : 'Saved' }}
-      </button>
     </header>
 
     <input
@@ -86,16 +88,6 @@ watch(() => route.params.id, load);
     />
 
     <TagPicker entity-type="note" :entity-id="route.params.id" :initial="original.universal_tags || []" />
-
-    <div v-if="false" class="flex items-center gap-3 text-sm">
-      <label class="text-slate-warm" for="tags">Legacy tags</label>
-      <input
-        id="tags"
-        v-model="tagsInput"
-        placeholder="comma, separated, tags"
-        class="flex-1 bg-transparent focus:outline-none placeholder-slate-warm/60"
-      />
-    </div>
 
     <TiptapEditor v-model="draft.body" min-height="420px" />
 

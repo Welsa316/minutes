@@ -8,7 +8,15 @@ export const useToastStore = defineStore('toast', () => {
 
   function show(message, opts = {}) {
     const id = nextId++;
-    const t = { id, message, kind: opts.kind || 'info', ttl: opts.ttl ?? 3000 };
+    const t = {
+      id,
+      message,
+      kind: opts.kind || 'info',
+      ttl: opts.ttl ?? 3000,
+      // Optional undo affordance
+      action: opts.action || null,        // { label, run() }
+      countdownStart: opts.action ? Date.now() : null,
+    };
     items.value = [...items.value, t];
     if (t.ttl > 0) setTimeout(() => dismiss(id), t.ttl);
     return id;
@@ -21,5 +29,12 @@ export const useToastStore = defineStore('toast', () => {
     items.value = items.value.filter((t) => t.id !== id);
   }
 
-  return { items, show, info, success, error, dismiss };
+  async function runAction(id) {
+    const t = items.value.find((x) => x.id === id);
+    if (!t?.action) return;
+    try { await t.action.run(); } catch {}
+    dismiss(id);
+  }
+
+  return { items, show, info, success, error, dismiss, runAction };
 });

@@ -46,4 +46,33 @@ router.beforeEach(async (to) => {
   }
 });
 
+// View Transitions API — when supported, route changes morph instead of cut.
+// Shared elements with matching `view-transition-name` (set in components)
+// fly between pages. Falls through gracefully on unsupported browsers.
+const originalPush = router.push.bind(router);
+const originalReplace = router.replace.bind(router);
+
+function withTransition(fn) {
+  return function (...args) {
+    if (
+      typeof document !== 'undefined' &&
+      typeof document.startViewTransition === 'function' &&
+      !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return new Promise((resolve, reject) => {
+        document.startViewTransition(async () => {
+          try {
+            const result = await fn(...args);
+            resolve(result);
+          } catch (e) { reject(e); }
+        });
+      });
+    }
+    return fn(...args);
+  };
+}
+
+router.push = withTransition(originalPush);
+router.replace = withTransition(originalReplace);
+
 export default router;

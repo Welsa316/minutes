@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { actionItems as api } from '../api/endpoints.js';
 import { useToastStore } from '../stores/toast.js';
 import { useSettingsStore } from '../stores/settings.js';
@@ -118,6 +118,15 @@ function ymd(d) {
 
 <template>
   <div>
+    <div v-if="items.length" class="mb-2 flex items-center gap-3 text-xs text-slate-warm">
+      <span class="tabular-nums">{{ items.filter(i => i.done).length }} / {{ items.length }} done</span>
+      <div class="flex-1 h-1 rounded-full bg-sand overflow-hidden">
+        <div
+          class="h-full bg-terracotta transition-all duration-500"
+          :style="{ width: (items.length ? items.filter(i => i.done).length / items.length * 100 : 0) + '%' }"
+        />
+      </div>
+    </div>
     <TransitionGroup name="ai" tag="ul" v-if="items.length" class="divide-y divide-sand/60">
       <li
         v-for="i in items"

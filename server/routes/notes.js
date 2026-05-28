@@ -5,15 +5,16 @@ const router = Router();
 
 router.get('/', async (req, res, next) => {
   try {
-    const { tag } = req.query;
+    const { tag, trash } = req.query;
     const params = [];
-    let where = '';
+    const conds = [trash === 'true' ? 'n.deleted_at IS NOT NULL' : 'n.deleted_at IS NULL'];
     if (tag) {
       params.push(tag);
-      where = `WHERE EXISTS (SELECT 1 FROM entity_tags et2 JOIN tags t2 ON t2.id=et2.tag_id
+      conds.push(`(EXISTS (SELECT 1 FROM entity_tags et2 JOIN tags t2 ON t2.id=et2.tag_id
                               WHERE et2.entity_type='note' AND et2.entity_id=n.id AND t2.name=$${params.length})
-                 OR $${params.length} = ANY(n.tags)`;
+                 OR $${params.length} = ANY(n.tags))`);
     }
+    const where = `WHERE ${conds.join(' AND ')}`;
     const { rows } = await query(
       `SELECT n.*,
               COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS universal_tags
@@ -76,6 +77,28 @@ router.put('/:id', async (req, res, next) => {
 });
 
 router.delete('/:id', async (req, res, next) => {
+  try {
+    const r = await query(
+      'UPDATE notes SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
+      [req.params.id],
+    );
+    if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
+    res.status(204).end();
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/restore', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      'UPDATE notes SET deleted_at = NULL WHERE id = $1 RETURNING *',
+      [req.params.id],
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'not found' });
+    res.json(rows[0]);
+  } catch (e) { next(e); }
+});
+
+router.delete('/:id/permanent', async (req, res, next) => {
   try {
     const r = await query('DELETE FROM notes WHERE id = $1', [req.params.id]);
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
