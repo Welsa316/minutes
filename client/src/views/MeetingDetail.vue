@@ -189,7 +189,7 @@ watch(() => route.params.id, load);
       </div>
     </div>
 
-    <div class="border-b border-sand flex items-center gap-1">
+    <div class="border-b border-sand flex items-center gap-1 overflow-x-auto">
       <button
         @click="tab = 'pre'"
         :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',

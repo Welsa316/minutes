@@ -6,6 +6,7 @@ import { useToastStore } from '../stores/toast.js';
 import { parseSmart, humanizeDay } from '../utils/dates.js';
 import EmptyState from '../components/EmptyState.vue';
 import Skeleton from '../components/Skeleton.vue';
+import MicButton from '../components/MicButton.vue';
 import { startOfToday, endOfWeek, isToday } from 'date-fns';
 
 const ws = useWorkspaceStore();
@@ -183,18 +184,19 @@ function wsColor(t) {
       </span>
     </header>
 
-    <form @submit.prevent="create" class="card flex items-center gap-3 py-2.5 px-4">
+    <form @submit.prevent="create" class="card flex items-center gap-2 sm:gap-3 py-2.5 px-3 sm:px-4 flex-wrap">
       <input
         v-model="newLabel"
         placeholder="New todo…"
-        class="flex-1 bg-transparent focus:outline-none placeholder-slate-warm/60"
+        class="flex-1 min-w-[8rem] bg-transparent focus:outline-none placeholder-slate-warm/60"
       />
+      <MicButton v-model="newLabel" mode="append" />
       <input
         v-model="newDate"
         placeholder="tomorrow, fri 2pm…"
-        class="bg-transparent focus:outline-none text-sm text-slate-warm placeholder-slate-warm/50 w-40"
+        class="bg-transparent focus:outline-none text-sm text-slate-warm placeholder-slate-warm/50 w-32 sm:w-40"
       />
-      <span v-if="parsedNewDate" class="text-xs text-slate-warm">→ {{ humanizeDay(parsedNewDate) }}</span>
+      <span v-if="parsedNewDate" class="text-xs text-slate-warm hidden sm:inline">→ {{ humanizeDay(parsedNewDate) }}</span>
       <select v-model="newWorkspaceId" class="bg-transparent text-sm text-slate-warm focus:outline-none">
         <option :value="null">No workspace</option>
         <option v-for="w in ws.list" :key="w.id" :value="w.id">{{ w.name }}</option>

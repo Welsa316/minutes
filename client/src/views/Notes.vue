@@ -4,6 +4,7 @@ import { useRouter, RouterLink } from 'vue-router';
 import { notes as api } from '../api/endpoints.js';
 import EmptyState from '../components/EmptyState.vue';
 import Skeleton from '../components/Skeleton.vue';
+import MicButton from '../components/MicButton.vue';
 import { useListNav } from '../composables/useListNav.js';
 
 const createInput = ref(null);
@@ -79,6 +80,7 @@ onMounted(load);
         placeholder="New note title… (press c)"
         class="flex-1 bg-transparent focus:outline-none placeholder-slate-warm/60"
       />
+      <MicButton v-model="newTitle" mode="append" />
       <button type="submit" :disabled="!newTitle.trim() || creating" class="btn-primary text-sm">Add</button>
     </form>
 

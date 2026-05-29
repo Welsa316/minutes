@@ -10,8 +10,22 @@ import Mention from '@tiptap/extension-mention';
 import 'tippy.js/dist/tippy.css';
 import { mentionSuggestion, SlashCommand } from '../composables/tiptapSuggestions.js';
 import { Callout } from '../composables/calloutNode.js';
+import { useSpeech } from '../composables/useSpeech.js';
 
 const router = useRouter();
+const speech = useSpeech();
+
+let dictateBuffer = '';
+function toggleDictate() {
+  if (speech.listening.value) { speech.stop(); return; }
+  dictateBuffer = '';
+  speech.start({ interim: false, continuous: true }, (text, isFinal) => {
+    if (isFinal && editor.value) {
+      editor.value.chain().focus().insertContent((dictateBuffer ? ' ' : '') + text).run();
+      dictateBuffer += text;
+    }
+  });
+}
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -122,6 +136,15 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
       <span class="mx-1 w-px h-4 bg-sand" />
       <button type="button" class="tp-btn" @click="run(c => c.undo())" title="Undo">&#8630;</button>
       <button type="button" class="tp-btn" @click="run(c => c.redo())" title="Redo">&#8631;</button>
+      <button
+        v-if="speech.supported"
+        type="button"
+        :class="['tp-btn ml-auto', speech.listening.value && 'bg-terracotta text-warm']"
+        @click="toggleDictate"
+        :title="speech.listening.value ? 'Stop dictation' : 'Dictate'"
+      >
+        <svg class="h-3.5 w-3.5 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><line x1="12" y1="19" x2="12" y2="22" /></svg>
+      </button>
     </div>
     <BubbleMenu v-if="editor" :editor="editor" :tippy-options="{ duration: 120 }" class="flex items-center gap-0.5 bg-surface border border-sand rounded-md shadow-lg px-1 py-1">
       <button type="button" class="tp-btn" :class="isActive('bold') && 'tp-btn-active'" @click="run(c => c.toggleBold())"><span class="font-bold">B</span></button>

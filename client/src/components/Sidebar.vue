@@ -5,6 +5,7 @@ import { pinned as pinnedApi } from '../api/endpoints.js';
 import { useRecent } from '../composables/useRecent.js';
 import { useSettingsStore } from '../stores/settings.js';
 import { useWorkspaceStore } from '../stores/workspace.js';
+import { useUiStore } from '../stores/ui.js';
 import { clientColor, initials } from '../utils/colors.js';
 import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
 
@@ -13,6 +14,7 @@ defineEmits(['logout']);
 const route = useRoute();
 const settings = useSettingsStore();
 const ws = useWorkspaceStore();
+const ui = useUiStore();
 const { items: recents } = useRecent();
 const pinned = ref([]);
 const loading = ref(true);
@@ -57,9 +59,21 @@ watch(() => ws.activeId, loadPinned);
 </script>
 
 <template>
-  <aside class="w-60 shrink-0 border-r border-sand bg-warm flex flex-col">
-    <div class="px-2 py-3 border-b border-sand">
-      <WorkspaceSwitcher />
+  <aside
+    :class="[
+      'w-60 shrink-0 border-r border-sand bg-warm flex flex-col',
+      'fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-out',
+      'lg:static lg:translate-x-0 lg:z-auto',
+      ui.sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full',
+    ]"
+  >
+    <div class="px-2 py-3 border-b border-sand flex items-center gap-1">
+      <div class="flex-1 min-w-0"><WorkspaceSwitcher /></div>
+      <button
+        class="lg:hidden btn-ghost px-2 shrink-0"
+        @click="ui.closeSidebar()"
+        title="Close menu"
+      >✕</button>
     </div>
 
     <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-1">

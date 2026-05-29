@@ -190,8 +190,8 @@ onMounted(load);
               <TagChip v-for="t in m.tags" :key="t" :tag="t" size="xs" />
             </div>
           </div>
-          <span v-if="m.location" class="text-xs text-slate-warm capitalize">{{ m.location }}</span>
-          <span class="text-xs text-slate-warm tabular-nums whitespace-nowrap">{{ fmtDate(m.date) }}</span>
+          <span v-if="m.location" class="hidden sm:inline text-xs text-slate-warm capitalize">{{ m.location }}</span>
+          <span class="text-xs text-slate-warm tabular-nums whitespace-nowrap shrink-0">{{ fmtDate(m.date) }}</span>
         </li>
         </RouterLink>
       </ul>
@@ -220,7 +220,7 @@ onMounted(load);
           v-for="d in gridDays"
           :key="d.toISOString()"
           :class="[
-            'bg-surface p-1.5 min-h-[5.5rem] flex flex-col gap-1',
+            'bg-surface p-1 sm:p-1.5 min-h-[3.5rem] sm:min-h-[5.5rem] flex flex-col gap-1',
             !isSameMonth(d, cursor) && 'opacity-40',
           ]"
         >

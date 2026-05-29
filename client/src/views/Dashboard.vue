@@ -81,9 +81,9 @@ onMounted(load);
 
 <template>
   <div class="space-y-6 max-w-5xl">
-    <header class="flex items-baseline justify-between gap-4">
-      <h1 class="text-3xl font-serif text-ink">{{ greeting }}</h1>
-      <div class="flex items-center gap-4 text-xs text-slate-warm tabular-nums">
+    <header class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2">
+      <h1 class="text-2xl sm:text-3xl font-serif text-ink">{{ greeting }}</h1>
+      <div class="flex items-center gap-3 sm:gap-4 text-xs text-slate-warm tabular-nums flex-wrap">
         <span><CountUp :value="totals.clients" /> clients</span>
         <span><CountUp :value="totals.projects" /> projects</span>
         <span><CountUp :value="totals.meetings" /> meetings</span>

@@ -56,6 +56,14 @@
   /* Inputs already have their own ring styling; let theirs win */
   .input:focus-visible { outline: none; }
 
+  /* Touch devices: guarantee comfortable tap targets without bloating desktop. */
+  @media (pointer: coarse) {
+    .btn { min-height: 2.5rem; }
+    .input { min-height: 2.75rem; font-size: 16px; } /* 16px stops iOS zoom-on-focus */
+    .btn-ghost { min-height: 2.5rem; }
+    nav a, aside a { min-height: 2.5rem; display: flex; align-items: center; }
+  }
+
   /* Compact density: shrink row paddings & font weights so more fits on screen */
   [data-density="compact"] ul > li[class*="py-3"] { padding-top: 0.375rem; padding-bottom: 0.375rem; }
   [data-density="compact"] ul > li[class*="py-2.5"] { padding-top: 0.25rem; padding-bottom: 0.25rem; }
