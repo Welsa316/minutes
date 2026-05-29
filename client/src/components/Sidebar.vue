@@ -1,28 +1,35 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { pinned as pinnedApi } from '../api/endpoints.js';
 import { useRecent } from '../composables/useRecent.js';
 import { useSettingsStore } from '../stores/settings.js';
+import { useWorkspaceStore } from '../stores/workspace.js';
 import { clientColor, initials } from '../utils/colors.js';
-
-const settings = useSettingsStore();
+import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
 
 defineEmits(['logout']);
 
 const route = useRoute();
+const settings = useSettingsStore();
+const ws = useWorkspaceStore();
 const { items: recents } = useRecent();
 const pinned = ref([]);
 const loading = ref(true);
 
-const links = [
-  { to: '/', label: 'Dashboard', exact: true },
-  { to: '/clients', label: 'Clients' },
-  { to: '/projects', label: 'Projects' },
-  { to: '/meetings', label: 'Meetings' },
-  { to: '/notes', label: 'Notes' },
-  { to: '/tags', label: 'Tags' },
+// All possible nav entries. Sidebar shows only those whose key is in the
+// active workspace's `sections` list.
+const ALL_LINKS = [
+  { key: 'dashboard', to: '/', label: 'Dashboard', exact: true, always: true },
+  { key: 'clients', to: '/clients', label: 'Clients' },
+  { key: 'projects', to: '/projects', label: 'Projects' },
+  { key: 'meetings', to: '/meetings', label: 'Meetings' },
+  { key: 'notes', to: '/notes', label: 'Notes' },
+  { key: 'todos', to: '/todos', label: 'Todos' },
+  { key: 'tags', to: '/tags', label: 'Tags' },
 ];
+
+const links = computed(() => ALL_LINKS.filter((l) => l.always || ws.has(l.key)));
 
 async function loadPinned() {
   loading.value = true;
@@ -31,9 +38,7 @@ async function loadPinned() {
   loading.value = false;
 }
 
-function pathFor(p) {
-  return `/${p.entity_type === 'note' ? 'notes' : p.entity_type + 's'}/${p.entity_id}`;
-}
+function pathFor(p) { return `/${p.entity_type === 'note' ? 'notes' : p.entity_type + 's'}/${p.entity_id}`; }
 
 function avatar(p) {
   if (p.entity_type === 'client') {
@@ -44,21 +49,20 @@ function avatar(p) {
 }
 
 onMounted(loadPinned);
-// reload pins when route changes (so adding a pin on a detail page reflects here)
 watch(() => route.fullPath, loadPinned);
+watch(() => ws.activeId, loadPinned);
 </script>
 
 <template>
   <aside class="w-60 shrink-0 border-r border-sand bg-warm flex flex-col">
-    <div class="px-5 py-5 border-b border-sand flex items-center gap-3">
-      <div class="h-8 w-8 grid place-items-center rounded-md bg-ink text-warm font-serif text-lg leading-none">m</div>
-      <span class="font-serif text-lg text-ink">Minutes</span>
+    <div class="px-2 py-3 border-b border-sand">
+      <WorkspaceSwitcher />
     </div>
 
     <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-1">
       <RouterLink
         v-for="l in links"
-        :key="l.to"
+        :key="l.key"
         :to="l.to"
         v-slot="{ isActive, isExactActive, href, navigate }"
         custom
@@ -108,7 +112,7 @@ watch(() => route.fullPath, loadPinned);
     </nav>
 
     <div class="p-3 border-t border-sand space-y-2">
-      <RouterLink to="/meetings/new" class="btn-primary w-full text-sm">+ New meeting</RouterLink>
+      <RouterLink v-if="ws.has('meetings')" to="/meetings/new" class="btn-primary w-full text-sm">+ New meeting</RouterLink>
       <div class="flex items-center gap-1">
         <button class="btn-ghost flex-1 text-sm" @click="$emit('logout')">Sign out</button>
         <button
@@ -124,7 +128,7 @@ watch(() => route.fullPath, loadPinned);
         <button
           class="btn-ghost px-2 text-sm"
           @click="settings.cycleTheme"
-          :title="`Theme: ${settings.theme} (click to cycle)`"
+          :title="`Theme: ${settings.theme}`"
         >
           <span v-if="settings.theme === 'light'">☀</span>
           <span v-else-if="settings.theme === 'dark'">☾</span>

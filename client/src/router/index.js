@@ -24,6 +24,7 @@ const routes = [
       { path: 'notes/:id',       name: 'note',        component: () => import('../views/NoteDetail.vue') },
       { path: 'tags',            name: 'tags',        component: () => import('../views/Tags.vue') },
       { path: 'tags/:name',      name: 'tag',         component: () => import('../views/TagDetail.vue') },
+      { path: 'todos',           name: 'todos',       component: () => import('../views/Todos.vue') },
       { path: 'calendar',        name: 'calendar',    redirect: '/meetings?view=calendar' },
     ],
   },

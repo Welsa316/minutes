@@ -6,8 +6,9 @@ const router = Router();
 router.get('/', async (req, res, next) => {
   try {
     const { status, client_id, tag, trash } = req.query;
-    const params = [];
-    const conds = [trash === 'true' ? 'p.deleted_at IS NOT NULL' : 'p.deleted_at IS NULL'];
+    const params = [req.workspaceId];
+    const conds = ['p.workspace_id = $1'];
+    conds.push(trash === 'true' ? 'p.deleted_at IS NOT NULL' : 'p.deleted_at IS NULL');
     if (status) { params.push(status); conds.push(`p.status = $${params.length}`); }
     if (client_id) { params.push(client_id); conds.push(`p.client_id = $${params.length}`); }
     if (tag) {
@@ -41,9 +42,9 @@ router.get('/:id', async (req, res, next) => {
        LEFT JOIN clients c ON c.id = p.client_id
        LEFT JOIN entity_tags et ON et.entity_type='project' AND et.entity_id=p.id
        LEFT JOIN tags t ON t.id = et.tag_id
-       WHERE p.id = $1
+       WHERE p.id = $1 AND p.workspace_id = $2
        GROUP BY p.id, c.name`,
-      [req.params.id],
+      [req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
@@ -55,9 +56,9 @@ router.post('/', async (req, res, next) => {
     const { name, client_id, status, deadline, budget_cents, description } = req.body || {};
     if (!name) return res.status(400).json({ error: 'name required' });
     const { rows } = await query(
-      `INSERT INTO projects (name, client_id, status, deadline, budget_cents, description)
-       VALUES ($1, $2, COALESCE($3, 'proposed'), $4, $5, $6) RETURNING *`,
-      [name, client_id || null, status || null, deadline || null, budget_cents ?? null, description || null],
+      `INSERT INTO projects (workspace_id, name, client_id, status, deadline, budget_cents, description)
+       VALUES ($1, $2, $3, COALESCE($4, 'proposed'), $5, $6, $7) RETURNING *`,
+      [req.workspaceId, name, client_id || null, status || null, deadline || null, budget_cents ?? null, description || null],
     );
     res.status(201).json(rows[0]);
   } catch (e) { next(e); }
@@ -74,8 +75,8 @@ router.put('/:id', async (req, res, next) => {
          deadline     = $4,
          budget_cents = $5,
          description  = $6
-       WHERE id = $7 RETURNING *`,
-      [name, client_id, status, deadline, budget_cents, description, req.params.id],
+       WHERE id = $7 AND workspace_id = $8 RETURNING *`,
+      [name, client_id, status, deadline, budget_cents, description, req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
@@ -85,8 +86,8 @@ router.put('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const r = await query(
-      'UPDATE projects SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
-      [req.params.id],
+      'UPDATE projects SET deleted_at = NOW() WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL',
+      [req.params.id, req.workspaceId],
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
     res.status(204).end();
@@ -96,8 +97,8 @@ router.delete('/:id', async (req, res, next) => {
 router.post('/:id/restore', async (req, res, next) => {
   try {
     const { rows } = await query(
-      'UPDATE projects SET deleted_at = NULL WHERE id = $1 RETURNING *',
-      [req.params.id],
+      'UPDATE projects SET deleted_at = NULL WHERE id = $1 AND workspace_id = $2 RETURNING *',
+      [req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
@@ -106,7 +107,10 @@ router.post('/:id/restore', async (req, res, next) => {
 
 router.delete('/:id/permanent', async (req, res, next) => {
   try {
-    const r = await query('DELETE FROM projects WHERE id = $1', [req.params.id]);
+    const r = await query(
+      'DELETE FROM projects WHERE id = $1 AND workspace_id = $2',
+      [req.params.id, req.workspaceId],
+    );
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
     res.status(204).end();
   } catch (e) { next(e); }

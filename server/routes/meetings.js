@@ -6,8 +6,9 @@ const router = Router();
 router.get('/', async (req, res, next) => {
   try {
     const { client_id, project_id, upcoming, tag, from, to, trash } = req.query;
-    const params = [];
-    const conds = [trash === 'true' ? 'm.deleted_at IS NOT NULL' : 'm.deleted_at IS NULL'];
+    const params = [req.workspaceId];
+    const conds = ['m.workspace_id = $1'];
+    conds.push(trash === 'true' ? 'm.deleted_at IS NOT NULL' : 'm.deleted_at IS NULL');
     if (client_id) { params.push(client_id); conds.push(`m.client_id = $${params.length}`); }
     if (project_id) { params.push(project_id); conds.push(`m.project_id = $${params.length}`); }
     if (upcoming === 'true') { conds.push(`m.date >= NOW()`); }
@@ -51,9 +52,9 @@ router.get('/:id', async (req, res, next) => {
        LEFT JOIN projects p ON p.id = m.project_id
        LEFT JOIN entity_tags et ON et.entity_type='meeting' AND et.entity_id=m.id
        LEFT JOIN tags t ON t.id = et.tag_id
-       WHERE m.id = $1
+       WHERE m.id = $1 AND m.workspace_id = $2
        GROUP BY m.id, c.name, p.name`,
-      [req.params.id],
+      [req.params.id, req.workspaceId],
     );
     if (!mrows[0]) return res.status(404).json({ error: 'not found' });
     const { rows: actionItems } = await query(
@@ -69,9 +70,10 @@ router.post('/', async (req, res, next) => {
     const { title, client_id, project_id, date, location, pre_notes, live_notes, summary } = req.body || {};
     if (!title) return res.status(400).json({ error: 'title required' });
     const { rows } = await query(
-      `INSERT INTO meetings (title, client_id, project_id, date, location, pre_notes, live_notes, summary)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      `INSERT INTO meetings (workspace_id, title, client_id, project_id, date, location, pre_notes, live_notes, summary)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
       [
+        req.workspaceId,
         title,
         client_id || null,
         project_id || null,
@@ -99,8 +101,8 @@ router.put('/:id', async (req, res, next) => {
          pre_notes   = $6,
          live_notes  = $7,
          summary     = $8
-       WHERE id = $9 RETURNING *`,
-      [title, client_id, project_id, date, location, pre_notes, live_notes, summary, req.params.id],
+       WHERE id = $9 AND workspace_id = $10 RETURNING *`,
+      [title, client_id, project_id, date, location, pre_notes, live_notes, summary, req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
@@ -110,8 +112,8 @@ router.put('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const r = await query(
-      'UPDATE meetings SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
-      [req.params.id],
+      'UPDATE meetings SET deleted_at = NOW() WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL',
+      [req.params.id, req.workspaceId],
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
     res.status(204).end();
@@ -121,8 +123,8 @@ router.delete('/:id', async (req, res, next) => {
 router.post('/:id/restore', async (req, res, next) => {
   try {
     const { rows } = await query(
-      'UPDATE meetings SET deleted_at = NULL WHERE id = $1 RETURNING *',
-      [req.params.id],
+      'UPDATE meetings SET deleted_at = NULL WHERE id = $1 AND workspace_id = $2 RETURNING *',
+      [req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
@@ -131,7 +133,10 @@ router.post('/:id/restore', async (req, res, next) => {
 
 router.delete('/:id/permanent', async (req, res, next) => {
   try {
-    const r = await query('DELETE FROM meetings WHERE id = $1', [req.params.id]);
+    const r = await query(
+      'DELETE FROM meetings WHERE id = $1 AND workspace_id = $2',
+      [req.params.id, req.workspaceId],
+    );
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
     res.status(204).end();
   } catch (e) { next(e); }

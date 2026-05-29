@@ -6,8 +6,9 @@ const router = Router();
 router.get('/', async (req, res, next) => {
   try {
     const { tag, trash } = req.query;
-    const params = [];
-    const conds = [trash === 'true' ? 'n.deleted_at IS NOT NULL' : 'n.deleted_at IS NULL'];
+    const params = [req.workspaceId];
+    const conds = ['n.workspace_id = $1'];
+    conds.push(trash === 'true' ? 'n.deleted_at IS NOT NULL' : 'n.deleted_at IS NULL');
     if (tag) {
       params.push(tag);
       conds.push(`(EXISTS (SELECT 1 FROM entity_tags et2 JOIN tags t2 ON t2.id=et2.tag_id
@@ -38,9 +39,9 @@ router.get('/:id', async (req, res, next) => {
        FROM notes n
        LEFT JOIN entity_tags et ON et.entity_type='note' AND et.entity_id=n.id
        LEFT JOIN tags t ON t.id = et.tag_id
-       WHERE n.id = $1
+       WHERE n.id = $1 AND n.workspace_id = $2
        GROUP BY n.id`,
-      [req.params.id],
+      [req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
@@ -52,9 +53,9 @@ router.post('/', async (req, res, next) => {
     const { title, body, tags } = req.body || {};
     if (!title) return res.status(400).json({ error: 'title required' });
     const { rows } = await query(
-      `INSERT INTO notes (title, body, tags)
-       VALUES ($1, $2, COALESCE($3, '{}'::text[])) RETURNING *`,
-      [title, body || null, Array.isArray(tags) ? tags : null],
+      `INSERT INTO notes (workspace_id, title, body, tags)
+       VALUES ($1, $2, $3, COALESCE($4, '{}'::text[])) RETURNING *`,
+      [req.workspaceId, title, body || null, Array.isArray(tags) ? tags : null],
     );
     res.status(201).json(rows[0]);
   } catch (e) { next(e); }
@@ -68,8 +69,8 @@ router.put('/:id', async (req, res, next) => {
          title = COALESCE($1, title),
          body  = $2,
          tags  = COALESCE($3, tags)
-       WHERE id = $4 RETURNING *`,
-      [title, body, Array.isArray(tags) ? tags : null, req.params.id],
+       WHERE id = $4 AND workspace_id = $5 RETURNING *`,
+      [title, body, Array.isArray(tags) ? tags : null, req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
@@ -79,8 +80,8 @@ router.put('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const r = await query(
-      'UPDATE notes SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
-      [req.params.id],
+      'UPDATE notes SET deleted_at = NOW() WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL',
+      [req.params.id, req.workspaceId],
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
     res.status(204).end();
@@ -90,8 +91,8 @@ router.delete('/:id', async (req, res, next) => {
 router.post('/:id/restore', async (req, res, next) => {
   try {
     const { rows } = await query(
-      'UPDATE notes SET deleted_at = NULL WHERE id = $1 RETURNING *',
-      [req.params.id],
+      'UPDATE notes SET deleted_at = NULL WHERE id = $1 AND workspace_id = $2 RETURNING *',
+      [req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
@@ -100,7 +101,10 @@ router.post('/:id/restore', async (req, res, next) => {
 
 router.delete('/:id/permanent', async (req, res, next) => {
   try {
-    const r = await query('DELETE FROM notes WHERE id = $1', [req.params.id]);
+    const r = await query(
+      'DELETE FROM notes WHERE id = $1 AND workspace_id = $2',
+      [req.params.id, req.workspaceId],
+    );
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
     res.status(204).end();
   } catch (e) { next(e); }

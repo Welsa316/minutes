@@ -1,0 +1,66 @@
+import { defineStore } from 'pinia';
+import { ref, computed, watch } from 'vue';
+import { api, setApiWorkspaceId } from '../api/index.js';
+
+const ACTIVE_KEY = 'minutes:workspace';
+
+export const useWorkspaceStore = defineStore('workspace', () => {
+  const list = ref([]);
+  const activeId = ref(loadActive());
+  const loading = ref(true);
+
+  const active = computed(() => list.value.find((w) => w.id === activeId.value) || list.value[0] || null);
+  const sections = computed(() => new Set(active.value?.sections || []));
+  function has(section) { return sections.value.has(section); }
+
+  function loadActive() {
+    try {
+      const raw = localStorage.getItem(ACTIVE_KEY);
+      if (!raw) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : null;
+    } catch { return null; }
+  }
+
+  function persistActive() {
+    try { localStorage.setItem(ACTIVE_KEY, String(activeId.value ?? '')); } catch {}
+  }
+
+  async function load() {
+    loading.value = true;
+    try {
+      const { data } = await api.get('/workspaces');
+      list.value = data;
+      if (!list.value.find((w) => w.id === activeId.value)) {
+        activeId.value = list.value[0]?.id ?? null;
+        persistActive();
+      }
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  function setActive(id) {
+    activeId.value = id;
+    persistActive();
+    // Notify other tabs / wakers that the workspace flipped
+    window.dispatchEvent(new CustomEvent('minutes:workspace-changed', { detail: { id } }));
+  }
+
+  function setActiveBySlug(slug) {
+    const w = list.value.find((x) => x.slug === slug);
+    if (w) setActive(w.id);
+  }
+
+  async function create(body) {
+    const { data } = await api.post('/workspaces', body);
+    await load();
+    if (data?.id) setActive(data.id);
+    return data;
+  }
+
+  // Sync the active workspace into the axios interceptor any time it changes.
+  watch(activeId, (v) => setApiWorkspaceId(v), { immediate: true });
+
+  return { list, activeId, active, sections, has, loading, load, setActive, setActiveBySlug, create };
+});

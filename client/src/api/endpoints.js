@@ -51,3 +51,19 @@ export const savedViews = {
   update: (id, body) => api.put(`/saved-views/${id}`, body).then((r) => r.data),
   remove: (id) => api.delete(`/saved-views/${id}`),
 };
+
+export const workspaces = {
+  list: () => api.get('/workspaces').then((r) => r.data),
+  create: (body) => api.post('/workspaces', body).then((r) => r.data),
+  update: (id, body) => api.put(`/workspaces/${id}`, body).then((r) => r.data),
+  remove: (id) => api.delete(`/workspaces/${id}`),
+};
+
+export const todos = {
+  list: (params) => api.get('/todos', { params }).then((r) => r.data),
+  create: (body) => api.post('/todos', body).then((r) => r.data),
+  update: (id, body) => api.put(`/todos/${id}`, body).then((r) => r.data),
+  toggle: (id) => api.patch(`/todos/${id}/toggle`).then((r) => r.data),
+  remove: (id) => api.delete(`/todos/${id}`),
+  restore: (id) => api.post(`/todos/${id}/restore`).then((r) => r.data),
+};

@@ -1,11 +1,13 @@
 <script setup>
 import { useRouter, RouterView } from 'vue-router';
 import { useAuthStore } from '../stores/auth.js';
+import { useWorkspaceStore } from '../stores/workspace.js';
 import Sidebar from './Sidebar.vue';
 import TopNav from './TopNav.vue';
 
 const router = useRouter();
 const auth = useAuthStore();
+const ws = useWorkspaceStore();
 
 async function onLogout() {
   await auth.logout();
@@ -21,7 +23,8 @@ async function onLogout() {
       <main class="flex-1 p-6 lg:p-8 overflow-y-auto">
         <RouterView v-slot="{ Component, route }">
           <Transition name="page" mode="out-in">
-            <component :is="Component" :key="route.fullPath" />
+            <!-- Key includes workspace id so switching workspaces fully re-mounts the view. -->
+            <component :is="Component" :key="`${ws.activeId}:${route.fullPath}`" />
           </Transition>
         </RouterView>
       </main>

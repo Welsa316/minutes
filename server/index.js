@@ -16,6 +16,9 @@ import searchRoutes from './routes/search.js';
 import tagsRoutes from './routes/tags.js';
 import pinnedRoutes from './routes/pinned.js';
 import savedViewsRoutes from './routes/savedViews.js';
+import workspacesRoutes from './routes/workspaces.js';
+import todosRoutes from './routes/todos.js';
+import { workspaceScope } from './middleware/workspace.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
@@ -40,15 +43,21 @@ app.use(cookieParser());
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRoutes);
-app.use('/api/clients', requireAuth, clientsRoutes);
-app.use('/api/projects', requireAuth, projectsRoutes);
-app.use('/api/meetings', requireAuth, meetingsRoutes);
-app.use('/api/notes', requireAuth, notesRoutes);
-app.use('/api/action-items', requireAuth, actionItemsRoutes);
-app.use('/api/search', requireAuth, searchRoutes);
-app.use('/api/tags', requireAuth, tagsRoutes);
-app.use('/api/pinned', requireAuth, pinnedRoutes);
-app.use('/api/saved-views', requireAuth, savedViewsRoutes);
+
+// Workspaces themselves are NOT scoped to a workspace — they're the registry.
+app.use('/api/workspaces', requireAuth, workspacesRoutes);
+
+// Everything else operates inside the active workspace.
+app.use('/api/clients',      requireAuth, workspaceScope, clientsRoutes);
+app.use('/api/projects',     requireAuth, workspaceScope, projectsRoutes);
+app.use('/api/meetings',     requireAuth, workspaceScope, meetingsRoutes);
+app.use('/api/notes',        requireAuth, workspaceScope, notesRoutes);
+app.use('/api/action-items', requireAuth, workspaceScope, actionItemsRoutes);
+app.use('/api/search',       requireAuth, workspaceScope, searchRoutes);
+app.use('/api/tags',         requireAuth, workspaceScope, tagsRoutes);
+app.use('/api/pinned',       requireAuth, workspaceScope, pinnedRoutes);
+app.use('/api/saved-views',  requireAuth, workspaceScope, savedViewsRoutes);
+app.use('/api/todos',        requireAuth, workspaceScope, todosRoutes);
 
 // In production, serve the built client from /client/dist. SPA fallback: any
 // non-/api request goes to index.html so vue-router can handle the route.

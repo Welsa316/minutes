@@ -18,6 +18,7 @@ const ACTIONS = [
   { label: 'Projects',     path: '/projects' },
   { label: 'Meetings',     path: '/meetings' },
   { label: 'Notes',        path: '/notes' },
+  { label: 'Todos',        path: '/todos' },
   { label: 'Tags',         path: '/tags' },
   { label: 'Calendar',     path: '/calendar' },
   { label: 'Kanban',       path: '/projects?view=kanban' },
