@@ -57,7 +57,9 @@ app.use('/api/search',       requireAuth, workspaceScope, searchRoutes);
 app.use('/api/tags',         requireAuth, workspaceScope, tagsRoutes);
 app.use('/api/pinned',       requireAuth, workspaceScope, pinnedRoutes);
 app.use('/api/saved-views',  requireAuth, workspaceScope, savedViewsRoutes);
-app.use('/api/todos',        requireAuth, workspaceScope, todosRoutes);
+
+// Todos are app-global. No workspaceScope.
+app.use('/api/todos',        requireAuth, todosRoutes);
 
 // In production, serve the built client from /client/dist. SPA fallback: any
 // non-/api request goes to index.html so vue-router can handle the route.

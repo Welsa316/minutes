@@ -12,7 +12,9 @@ router.get('/', async (req, res, next) => {
         (SELECT COUNT(*) FROM clients  WHERE workspace_id = w.id AND deleted_at IS NULL) AS client_count,
         (SELECT COUNT(*) FROM projects WHERE workspace_id = w.id AND deleted_at IS NULL) AS project_count,
         (SELECT COUNT(*) FROM notes    WHERE workspace_id = w.id AND deleted_at IS NULL) AS note_count,
-        (SELECT COUNT(*) FROM todos    WHERE workspace_id = w.id AND deleted_at IS NULL AND done = FALSE) AS open_todo_count
+        -- open_todo_count is total across all workspaces (todos are global now);
+        -- duplicated on each workspace row so the switcher can display it.
+        (SELECT COUNT(*) FROM todos WHERE deleted_at IS NULL AND done = FALSE) AS open_todo_count
       FROM workspaces w
       ORDER BY sort_order ASC, id ASC
     `);

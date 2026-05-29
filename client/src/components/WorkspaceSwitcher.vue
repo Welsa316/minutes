@@ -72,7 +72,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
           :style="{ background: w.color ? `#${w.color}` : '#0F1B2D' }"
         >{{ w.icon || w.name?.[0] }}</span>
         <span class="flex-1 truncate">{{ w.name }}</span>
-        <span v-if="w.open_todo_count && Number(w.open_todo_count) > 0" class="text-[10px] text-terracotta tabular-nums">{{ w.open_todo_count }}</span>
+        <span v-if="(Number(w.client_count) + Number(w.project_count) + Number(w.meeting_count) + Number(w.note_count)) > 0" class="text-[10px] text-slate-warm tabular-nums">{{ Number(w.client_count) + Number(w.project_count) + Number(w.meeting_count) + Number(w.note_count) }}</span>
       </button>
 
       <div class="border-t border-sand mt-1 pt-1">

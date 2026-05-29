@@ -17,19 +17,22 @@ const { items: recents } = useRecent();
 const pinned = ref([]);
 const loading = ref(true);
 
-// All possible nav entries. Sidebar shows only those whose key is in the
-// active workspace's `sections` list.
-const ALL_LINKS = [
+// Per-workspace entries — only the ones in active workspace.sections show up.
+const WORKSPACE_LINKS = [
   { key: 'dashboard', to: '/', label: 'Dashboard', exact: true, always: true },
   { key: 'clients', to: '/clients', label: 'Clients' },
   { key: 'projects', to: '/projects', label: 'Projects' },
   { key: 'meetings', to: '/meetings', label: 'Meetings' },
   { key: 'notes', to: '/notes', label: 'Notes' },
-  { key: 'todos', to: '/todos', label: 'Todos' },
   { key: 'tags', to: '/tags', label: 'Tags' },
 ];
 
-const links = computed(() => ALL_LINKS.filter((l) => l.always || ws.has(l.key)));
+// Global entries — always shown, workspace-independent.
+const GLOBAL_LINKS = [
+  { key: 'todos', to: '/todos', label: 'Todos' },
+];
+
+const wsLinks = computed(() => WORKSPACE_LINKS.filter((l) => l.always || ws.has(l.key)));
 
 async function loadPinned() {
   loading.value = true;
@@ -61,7 +64,7 @@ watch(() => ws.activeId, loadPinned);
 
     <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-1">
       <RouterLink
-        v-for="l in links"
+        v-for="l in wsLinks"
         :key="l.key"
         :to="l.to"
         v-slot="{ isActive, isExactActive, href, navigate }"
@@ -78,6 +81,27 @@ watch(() => ws.activeId, loadPinned);
           ]"
         >{{ l.label }}</a>
       </RouterLink>
+
+      <!-- Global section (workspace-independent) -->
+      <div class="pt-3">
+        <div class="px-3 pb-1 text-[10px] uppercase tracking-wider text-slate-warm">Across all</div>
+        <RouterLink
+          v-for="l in GLOBAL_LINKS"
+          :key="l.key"
+          :to="l.to"
+          v-slot="{ isActive, href, navigate }"
+          custom
+        >
+          <a
+            :href="href"
+            @click="navigate"
+            :class="[
+              'block px-3 py-1.5 rounded-md text-sm transition-colors',
+              isActive ? 'bg-sand text-ink font-medium' : 'text-slate-warm hover:bg-sand/50 hover:text-ink',
+            ]"
+          >{{ l.label }}</a>
+        </RouterLink>
+      </div>
 
       <div v-if="pinned.length" class="pt-3">
         <div class="px-3 pb-1 text-[10px] uppercase tracking-wider text-slate-warm">Pinned</div>
