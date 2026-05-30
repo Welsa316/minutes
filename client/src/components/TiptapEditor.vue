@@ -7,13 +7,41 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Link from '@tiptap/extension-link';
 import Mention from '@tiptap/extension-mention';
+import Image from '@tiptap/extension-image';
 import 'tippy.js/dist/tippy.css';
 import { mentionSuggestion, SlashCommand } from '../composables/tiptapSuggestions.js';
 import { Callout } from '../composables/calloutNode.js';
 import { useSpeech } from '../composables/useSpeech.js';
+import { api } from '../api/index.js';
+import { useToastStore } from '../stores/toast.js';
 
 const router = useRouter();
 const speech = useSpeech();
+const toast = useToastStore();
+const fileInput = ref(null);
+
+// Upload a Blob/File to the server, return its served URL.
+async function uploadImage(file) {
+  const { data } = await api.post('/uploads', file, { headers: { 'Content-Type': file.type } });
+  return data.url;
+}
+
+async function insertImage(file) {
+  if (!file || !file.type?.startsWith('image/')) return;
+  try {
+    const url = await uploadImage(file);
+    editor.value?.chain().focus().setImage({ src: url }).run();
+  } catch {
+    toast.error('Image upload failed');
+  }
+}
+
+function pickImage() { fileInput.value?.click(); }
+function onPickFile(e) {
+  const file = e.target.files?.[0];
+  if (file) insertImage(file);
+  e.target.value = '';
+}
 
 let dictateBuffer = '';
 function toggleDictate() {
@@ -64,6 +92,11 @@ const editor = useEditor({
     }),
     SlashCommand,
     Callout,
+    Image.configure({
+      inline: false,
+      allowBase64: false,
+      HTMLAttributes: { class: 'tp-img' },
+    }),
   ],
   editorProps: {
     attributes: { class: 'tp-prose focus:outline-none' },
@@ -79,6 +112,32 @@ const editor = useEditor({
         }
       }
       return false;
+    },
+    // Paste an image straight from the clipboard → upload → insert.
+    handlePaste: (view, event) => {
+      const items = event.clipboardData?.items;
+      if (!items) return false;
+      for (const item of items) {
+        if (item.type?.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            event.preventDefault();
+            insertImage(file);
+            return true;
+          }
+        }
+      }
+      return false;
+    },
+    // Drag-and-drop image files.
+    handleDrop: (view, event) => {
+      const files = event.dataTransfer?.files;
+      if (!files?.length) return false;
+      const imgs = [...files].filter((f) => f.type?.startsWith('image/'));
+      if (!imgs.length) return false;
+      event.preventDefault();
+      imgs.forEach(insertImage);
+      return true;
     },
   },
   onUpdate: ({ editor }) => emit('update:modelValue', editor.getHTML()),
@@ -133,6 +192,10 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
       <button type="button" class="tp-btn" :class="isActive('blockquote') && 'tp-btn-active'" @click="run(c => c.toggleBlockquote())" title="Quote">&ldquo;</button>
       <button type="button" class="tp-btn" :class="isActive('callout', { tone: 'info' }) && 'tp-btn-active'" @click="run(c => c.toggleCallout({ tone: 'info' }))" title="Callout / key decision">!</button>
       <button type="button" class="tp-btn" :class="isActive('callout', { tone: 'next' }) && 'tp-btn-active'" @click="run(c => c.toggleCallout({ tone: 'next' }))" title="Callout / follow-up">→</button>
+      <button type="button" class="tp-btn" @click="pickImage" title="Insert image (or just paste)">
+        <svg class="h-3.5 w-3.5 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" /></svg>
+      </button>
+      <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onPickFile" />
       <span class="mx-1 w-px h-4 bg-sand" />
       <button type="button" class="tp-btn" @click="run(c => c.undo())" title="Undo">&#8630;</button>
       <button type="button" class="tp-btn" @click="run(c => c.redo())" title="Redo">&#8631;</button>
@@ -181,6 +244,18 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
 .tp-prose ol ol ol { list-style: lower-roman; }
 .tp-prose ol ol ol ol { list-style: decimal; }
 .tp-prose a { color: theme('colors.terracotta'); text-decoration: underline; }
+.tp-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  border: 1px solid theme('colors.sand');
+  margin: 0.5rem 0;
+  display: block;
+}
+.tp-prose img.ProseMirror-selectednode {
+  outline: 2px solid theme('colors.terracotta');
+  outline-offset: 2px;
+}
 .tp-prose ul[data-type="taskList"] { list-style: none; padding-left: 0; }
 .tp-prose ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; }
 .tp-prose ul[data-type="taskList"] li > label { margin-top: 0.25rem; }
