@@ -46,20 +46,26 @@ router.post('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Partial update — only touches keys actually present in the body, so sending
+// { workspace_id: 2 } doesn't wipe due_date/notes/etc. workspace_id can be set
+// to null explicitly (unassign) since null is a meaningful value here.
 router.put('/:id', async (req, res, next) => {
   try {
-    const { label, due_date, priority, done, notes, workspace_id, sort_order } = req.body || {};
+    const body = req.body || {};
+    const ALLOWED = ['label', 'due_date', 'priority', 'done', 'notes', 'workspace_id', 'sort_order'];
+    const sets = [];
+    const params = [];
+    for (const key of ALLOWED) {
+      if (Object.prototype.hasOwnProperty.call(body, key)) {
+        params.push(body[key]);
+        sets.push(`${key} = $${params.length}`);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'no fields to update' });
+    params.push(req.params.id);
     const { rows } = await query(
-      `UPDATE todos SET
-         label        = COALESCE($1, label),
-         due_date     = $2,
-         priority     = $3,
-         done         = COALESCE($4, done),
-         notes        = $5,
-         workspace_id = $6,
-         sort_order   = COALESCE($7, sort_order)
-       WHERE id = $8 RETURNING *`,
-      [label, due_date, priority, done, notes, workspace_id ?? null, sort_order, req.params.id],
+      `UPDATE todos SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`,
+      params,
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
