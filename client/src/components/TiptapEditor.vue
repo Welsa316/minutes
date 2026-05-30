@@ -271,6 +271,8 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
 .tp-prose h2 { font-family: theme('fontFamily.serif'); font-size: 1.25rem; margin: 0.625rem 0 0.25rem; }
 .tp-prose h3 { font-family: theme('fontFamily.serif'); font-size: 1.125rem; margin: 0.5rem 0 0.25rem; }
 .tp-prose p { line-height: 1.6; margin: 0.25rem 0; }
+/* Bold = brand terracotta (still bold weight) */
+.tp-prose strong { color: theme('colors.terracotta'); font-weight: 700; }
 .tp-prose ul, .tp-prose ol { padding-left: 1.5rem; margin: 0.25rem 0; }
 /* Bullet lists step through markers by depth, like a real outline. */
 .tp-prose ul { list-style: disc; }
