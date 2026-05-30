@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { clients, projects, meetings } from '../api/endpoints.js';
-import { parseSmart, humanizeDate } from '../utils/dates.js';
 import { useToastStore } from '../stores/toast.js';
 import { useSettingsStore } from '../stores/settings.js';
 import { sounds } from '../utils/sounds.js';
@@ -14,7 +13,7 @@ const toast = useToastStore();
 
 const open = ref(false);
 const title = ref('');
-const dateText = ref('');
+const date = ref('');
 const location = ref('video');
 const clientId = ref('');
 const projectId = ref('');
@@ -23,7 +22,13 @@ const allProjects = ref([]);
 const submitting = ref(false);
 const inputEl = ref(null);
 
-const parsedDate = computed(() => (dateText.value ? parseSmart(dateText.value) : null));
+function nowLocal() {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 16);
+}
+
 const filteredProjects = computed(() => {
   if (!clientId.value) return allProjects.value;
   return allProjects.value.filter((p) => p.client_id === Number(clientId.value));
@@ -33,7 +38,7 @@ async function show() {
   open.value = true;
   if (settings.sound) sounds.whoosh();
   title.value = '';
-  dateText.value = '';
+  date.value = nowLocal();
   location.value = 'video';
   clientId.value = '';
   projectId.value = '';
@@ -54,7 +59,7 @@ async function submit() {
       client_id: clientId.value || null,
       project_id: projectId.value || null,
       location: location.value || null,
-      date: parsedDate.value ? parsedDate.value.toISOString() : null,
+      date: date.value ? new Date(date.value).toISOString() : null,
     });
     hide();
     toast.success(`Created "${m.title}"`);
@@ -109,8 +114,8 @@ defineExpose({ show, hide });
 
           <div class="px-4 py-2 border-t border-sand grid grid-cols-2 gap-2 text-sm">
             <input
-              v-model="dateText"
-              placeholder="when (e.g. tomorrow 2pm)"
+              v-model="date"
+              type="datetime-local"
               class="bg-transparent focus:outline-none text-slate-warm focus:text-ink"
             />
             <select v-model="location" class="bg-transparent focus:outline-none text-slate-warm">
@@ -128,10 +133,6 @@ defineExpose({ show, hide });
               <option v-for="p in filteredProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
           </div>
-
-          <p v-if="parsedDate" class="px-4 py-1.5 text-xs text-slate-warm border-t border-sand bg-sand/30">
-            → {{ humanizeDate(parsedDate) }}
-          </p>
 
           <div class="px-4 py-3 border-t border-sand flex items-center justify-end gap-2">
             <button type="button" @click="hide" class="btn-ghost text-sm">Cancel</button>

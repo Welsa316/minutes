@@ -4,7 +4,6 @@ import { useRoute, useRouter, RouterLink } from 'vue-router';
 import { meetings, clients, projects } from '../api/endpoints.js';
 import TiptapEditor from '../components/TiptapEditor.vue';
 import ActionItemList from '../components/ActionItemList.vue';
-import SmartDateInput from '../components/SmartDateInput.vue';
 import TagPicker from '../components/TagPicker.vue';
 import PinButton from '../components/PinButton.vue';
 import SaveStatus from '../components/SaveStatus.vue';
@@ -162,7 +161,7 @@ watch(() => route.params.id, load);
     <div class="grid grid-cols-1 md:grid-cols-4 gap-3 card">
       <div>
         <label class="label" for="m-date">When</label>
-        <SmartDateInput v-model="dateLocal" placeholder="tomorrow 2pm, next mon…" />
+        <input id="m-date" v-model="dateLocal" type="datetime-local" class="input" />
       </div>
       <div>
         <label class="label" for="m-loc">Where</label>

@@ -97,7 +97,7 @@ onMounted(load);
         <section class="card">
           <div class="flex items-baseline justify-between mb-3">
             <h2 class="font-serif text-lg text-ink">Upcoming meetings</h2>
-            <RouterLink to="/meetings?filter=upcoming" class="text-xs text-slate-warm hover:text-ink">All →</RouterLink>
+            <RouterLink to="/meetings" class="text-xs text-slate-warm hover:text-ink">All →</RouterLink>
           </div>
           <ul v-if="upcoming.length" class="space-y-2">
             <li v-for="m in upcoming" :key="m.id">

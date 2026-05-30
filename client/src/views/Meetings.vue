@@ -21,22 +21,39 @@ const route = useRoute();
 const router = useRouter();
 const items = ref([]);
 const loading = ref(true);
-const filter = computed({
-  get: () => route.query.filter || 'all',
-  set: (v) => router.replace({ query: { ...route.query, filter: v === 'all' ? undefined : v } }),
-});
 const activeTag = computed(() => route.query.tag || null);
 const view = ref(route.query.view === 'calendar' ? 'calendar' : 'list');
 const cursor = ref(new Date());
 
-const filtered = computed(() => {
-  const now = Date.now();
-  let rows = items.value;
-  if (activeTag.value) rows = rows.filter((m) => (m.tags || []).includes(activeTag.value));
-  if (filter.value === 'upcoming') return rows.filter((m) => m.date && new Date(m.date).getTime() >= now);
-  if (filter.value === 'past') return rows.filter((m) => m.date && new Date(m.date).getTime() < now);
-  return rows;
+const taggedItems = computed(() => {
+  if (!activeTag.value) return items.value;
+  return items.value.filter((m) => (m.tags || []).includes(activeTag.value));
 });
+
+function ts(m) { return m.date ? new Date(m.date).getTime() : null; }
+
+const upcomingMeetings = computed(() => {
+  const now = Date.now();
+  return taggedItems.value.filter((m) => ts(m) !== null && ts(m) >= now).sort((a, b) => ts(a) - ts(b));
+});
+const pastMeetings = computed(() => {
+  const now = Date.now();
+  return taggedItems.value.filter((m) => ts(m) !== null && ts(m) < now).sort((a, b) => ts(b) - ts(a));
+});
+const undatedMeetings = computed(() =>
+  taggedItems.value.filter((m) => ts(m) === null).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)),
+);
+
+const sections = computed(() => {
+  const out = [];
+  if (upcomingMeetings.value.length) out.push({ key: 'upcoming', label: 'Upcoming', rows: upcomingMeetings.value });
+  if (pastMeetings.value.length) out.push({ key: 'past', label: 'Past', rows: pastMeetings.value });
+  if (undatedMeetings.value.length) out.push({ key: 'undated', label: 'No date', rows: undatedMeetings.value });
+  return out;
+});
+
+// Flat list (display order) for multi-select + j/k navigation.
+const filtered = computed(() => [...upcomingMeetings.value, ...pastMeetings.value, ...undatedMeetings.value]);
 
 const gridDays = computed(() => {
   const start = startOfWeek(startOfMonth(cursor.value), { weekStartsOn: 1 });
@@ -143,13 +160,8 @@ onMounted(load);
 
     <!-- List view -->
     <template v-if="view === 'list'">
-      <div class="flex items-center gap-3 text-sm flex-wrap">
-        <div class="flex items-center gap-1">
-          <button @click="filter = 'all'" :class="['px-2.5 py-1 rounded', filter === 'all' ? 'bg-sand text-ink' : 'text-slate-warm hover:text-ink']">All</button>
-          <button @click="filter = 'upcoming'" :class="['px-2.5 py-1 rounded', filter === 'upcoming' ? 'bg-sand text-ink' : 'text-slate-warm hover:text-ink']">Upcoming</button>
-          <button @click="filter = 'past'" :class="['px-2.5 py-1 rounded', filter === 'past' ? 'bg-sand text-ink' : 'text-slate-warm hover:text-ink']">Past</button>
-        </div>
-        <SavedViewsBar section="meetings" :filter-keys="['filter', 'tag']" />
+      <div v-if="!loading && filtered.length" class="flex items-center gap-3 text-sm flex-wrap">
+        <SavedViewsBar section="meetings" :filter-keys="['tag']" />
       </div>
 
       <Skeleton v-if="loading" :rows="5" />
@@ -160,41 +172,48 @@ onMounted(load);
         hint="Track every conversation. Prep, capture, then close out with action items."
         shortcut="⌘N"
       />
-      <ul v-else class="border border-sand rounded-lg overflow-hidden bg-surface stagger">
-        <RouterLink
-          v-for="(m, idx) in filtered"
-          :key="m.id"
-          :to="`/meetings/${m.id}`"
-          custom
-          v-slot="{ navigate }"
-        >
-        <li
-          @click="(e) => (e.shiftKey || e.metaKey || e.ctrlKey || sel.hasSelection.value) ? sel.toggle(m.id, e) : navigate(e)"
-          :class="['group relative pl-4 pr-4 py-3 hover:bg-sand/40 cursor-pointer flex items-center gap-4', idx > 0 && 'border-t border-sand/60', selectedId === m.id && 'bg-sand/30 ring-1 ring-inset ring-terracotta/30', sel.isSelected(m.id) && 'bg-terracotta/10']"
-        >
-          <span v-if="m.client_name" aria-hidden class="absolute left-0 top-0 bottom-0 w-1" :style="{ background: clientColor(m.client_name).bg }" />
-          <input
-            type="checkbox"
-            :checked="sel.isSelected(m.id)"
-            @click.stop="sel.toggle(m.id, $event)"
-            :class="['h-4 w-4 rounded border-sand text-terracotta focus:ring-terracotta/40 transition-opacity', sel.hasSelection.value ? 'opacity-100' : 'opacity-0 group-hover:opacity-50 hover:!opacity-100']"
-          />
-          <div class="flex-1 min-w-0">
-            <div class="font-medium text-ink truncate">{{ m.title }}</div>
-            <div class="flex items-center gap-2 flex-wrap text-sm text-slate-warm">
-              <ClientChip v-if="m.client_name" :name="m.client_name" :id="m.client_id" size="sm" />
-              <template v-if="m.project_name">
-                <span>·</span>
-                <span class="truncate">{{ m.project_name }}</span>
-              </template>
-              <TagChip v-for="t in m.tags" :key="t" :tag="t" size="xs" />
+
+      <section v-for="sec in sections" v-else :key="sec.key" class="space-y-2">
+        <h2 class="text-xs uppercase tracking-wider text-slate-warm font-semibold flex items-center gap-2">
+          {{ sec.label }}
+          <span class="text-slate-warm/60 tabular-nums">{{ sec.rows.length }}</span>
+        </h2>
+        <ul class="border border-sand rounded-lg overflow-hidden bg-surface stagger">
+          <RouterLink
+            v-for="(m, idx) in sec.rows"
+            :key="m.id"
+            :to="`/meetings/${m.id}`"
+            custom
+            v-slot="{ navigate }"
+          >
+          <li
+            @click="(e) => (e.shiftKey || e.metaKey || e.ctrlKey || sel.hasSelection.value) ? sel.toggle(m.id, e) : navigate(e)"
+            :class="['group relative pl-4 pr-4 py-3 hover:bg-sand/40 cursor-pointer flex items-center gap-4', idx > 0 && 'border-t border-sand/60', selectedId === m.id && 'bg-sand/30 ring-1 ring-inset ring-terracotta/30', sel.isSelected(m.id) && 'bg-terracotta/10']"
+          >
+            <span v-if="m.client_name" aria-hidden class="absolute left-0 top-0 bottom-0 w-1" :style="{ background: clientColor(m.client_name).bg }" />
+            <input
+              type="checkbox"
+              :checked="sel.isSelected(m.id)"
+              @click.stop="sel.toggle(m.id, $event)"
+              :class="['h-4 w-4 rounded border-sand text-terracotta focus:ring-terracotta/40 transition-opacity', sel.hasSelection.value ? 'opacity-100' : 'opacity-0 group-hover:opacity-50 hover:!opacity-100']"
+            />
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-ink truncate">{{ m.title }}</div>
+              <div class="flex items-center gap-2 flex-wrap text-sm text-slate-warm">
+                <ClientChip v-if="m.client_name" :name="m.client_name" :id="m.client_id" size="sm" />
+                <template v-if="m.project_name">
+                  <span>·</span>
+                  <span class="truncate">{{ m.project_name }}</span>
+                </template>
+                <TagChip v-for="t in m.tags" :key="t" :tag="t" size="xs" />
+              </div>
             </div>
-          </div>
-          <span v-if="m.location" class="hidden sm:inline text-xs text-slate-warm capitalize">{{ m.location }}</span>
-          <span class="text-xs text-slate-warm tabular-nums whitespace-nowrap shrink-0">{{ fmtDate(m.date) }}</span>
-        </li>
-        </RouterLink>
-      </ul>
+            <span v-if="m.location" class="hidden sm:inline text-xs text-slate-warm capitalize">{{ m.location }}</span>
+            <span class="text-xs text-slate-warm tabular-nums whitespace-nowrap shrink-0">{{ fmtDate(m.date) }}</span>
+          </li>
+          </RouterLink>
+        </ul>
+      </section>
 
       <BulkActionBar
         :count="sel.count.value"
