@@ -89,7 +89,7 @@ watch(() => route.params.id, load);
 
     <TagPicker entity-type="note" :entity-id="route.params.id" :initial="original.universal_tags || []" />
 
-    <TiptapEditor v-model="draft.body" min-height="420px" />
+    <TiptapEditor v-model="draft.body" min-height="420px" max-height="68vh" />
 
     <p class="text-xs text-slate-warm">Created {{ fmtDate(original.created_at) }}</p>
   </div>

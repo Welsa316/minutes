@@ -107,6 +107,9 @@ function toggleDictate() {
 const props = defineProps({
   modelValue: { type: String, default: '' },
   minHeight: { type: String, default: '160px' },
+  // When set, the content area caps at this height and scrolls internally,
+  // so a long note doesn't grow the whole page (toolbar/tabs stay pinned).
+  maxHeight: { type: String, default: '' },
 });
 const emit = defineEmits(['update:modelValue']);
 
@@ -255,7 +258,11 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
       <button type="button" class="tp-btn" :class="isActive('code') && 'tp-btn-active'" @click="run(c => c.toggleCode())" title="Code"><span class="font-mono text-xs">{}</span></button>
       <button type="button" class="tp-btn" :class="isActive('link') && 'tp-btn-active'" @click="setLink">link</button>
     </BubbleMenu>
-    <EditorContent :editor="editor" class="px-3 py-2.5" :style="{ minHeight }" />
+    <EditorContent
+      :editor="editor"
+      :class="['px-3 py-2.5', maxHeight && 'overflow-y-auto']"
+      :style="{ minHeight, maxHeight: maxHeight || undefined }"
+    />
   </div>
 </template>
 

@@ -217,18 +217,18 @@ watch(() => route.params.id, load);
 
     <section v-show="tab === 'pre'">
       <p class="text-sm text-slate-warm mb-2">Prep notes, questions, agenda.</p>
-      <TiptapEditor v-model="draft.pre_notes" min-height="280px" />
+      <TiptapEditor v-model="draft.pre_notes" min-height="320px" max-height="62vh" />
     </section>
 
     <section v-show="tab === 'during'">
       <p class="text-sm text-slate-warm mb-2">Live notes during the meeting.</p>
-      <TiptapEditor v-model="draft.live_notes" min-height="360px" />
+      <TiptapEditor v-model="draft.live_notes" min-height="380px" max-height="64vh" />
     </section>
 
     <section v-show="tab === 'after'" class="space-y-6">
       <div>
         <p class="text-sm text-slate-warm mb-2">Summary.</p>
-        <TiptapEditor v-model="draft.summary" min-height="220px" />
+        <TiptapEditor v-model="draft.summary" min-height="240px" max-height="48vh" />
       </div>
       <div>
         <h3 class="font-serif text-lg text-ink mb-2">Action items</h3>
