@@ -67,14 +67,15 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { title, client_id, project_id, date, location, pre_notes, live_notes, summary } = req.body || {};
+    const { title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary } = req.body || {};
     if (!title) return res.status(400).json({ error: 'title required' });
     const { rows } = await query(
-      `INSERT INTO meetings (workspace_id, title, client_id, project_id, date, location, pre_notes, live_notes, summary)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      `INSERT INTO meetings (workspace_id, title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
       [
         req.workspaceId,
         title,
+        subject || null,
         client_id || null,
         project_id || null,
         date || null,
@@ -90,19 +91,20 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
   try {
-    const { title, client_id, project_id, date, location, pre_notes, live_notes, summary } = req.body || {};
+    const { title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary } = req.body || {};
     const { rows } = await query(
       `UPDATE meetings SET
          title       = COALESCE($1, title),
-         client_id   = $2,
-         project_id  = $3,
-         date        = $4,
-         location    = $5,
-         pre_notes   = $6,
-         live_notes  = $7,
-         summary     = $8
-       WHERE id = $9 AND workspace_id = $10 RETURNING *`,
-      [title, client_id, project_id, date, location, pre_notes, live_notes, summary, req.params.id, req.workspaceId],
+         subject     = $2,
+         client_id   = $3,
+         project_id  = $4,
+         date        = $5,
+         location    = $6,
+         pre_notes   = $7,
+         live_notes  = $8,
+         summary     = $9
+       WHERE id = $10 AND workspace_id = $11 RETURNING *`,
+      [title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary, req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);

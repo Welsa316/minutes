@@ -8,6 +8,7 @@ const allClients = ref([]);
 const allProjects = ref([]);
 
 const title = ref('');
+const subject = ref('');
 const clientId = ref('');
 const projectId = ref('');
 const location = ref('video');
@@ -34,6 +35,7 @@ async function create() {
   try {
     const m = await meetings.create({
       title: title.value.trim(),
+      subject: subject.value.trim() || null,
       client_id: clientId.value || null,
       project_id: projectId.value || null,
       location: location.value || null,
@@ -63,6 +65,11 @@ onMounted(async () => {
       <div>
         <label class="label" for="title">Title</label>
         <input id="title" v-model="title" required autofocus placeholder="Kickoff with…" class="input" />
+      </div>
+
+      <div>
+        <label class="label" for="subject">Subject</label>
+        <input id="subject" v-model="subject" placeholder="What's it about?" class="input" />
       </div>
 
       <div class="grid grid-cols-2 gap-3">

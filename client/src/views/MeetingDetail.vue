@@ -156,6 +156,12 @@ watch(() => route.params.id, load);
       class="w-full text-3xl font-serif text-ink bg-transparent border-none focus:outline-none focus:ring-0 px-0"
     />
 
+    <input
+      v-model="draft.subject"
+      placeholder="Subject — what's it about?"
+      class="w-full text-base text-slate-warm bg-transparent border-none focus:outline-none focus:ring-0 px-0 -mt-1"
+    />
+
     <TagPicker entity-type="meeting" :entity-id="route.params.id" :initial="original.tags || []" />
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-3 card">

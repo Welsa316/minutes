@@ -199,6 +199,7 @@ onMounted(load);
             />
             <div class="flex-1 min-w-0">
               <div class="font-medium text-ink truncate">{{ m.title }}</div>
+              <div v-if="m.subject" class="text-sm text-slate-warm truncate">{{ m.subject }}</div>
               <div class="flex items-center gap-2 flex-wrap text-sm text-slate-warm">
                 <ClientChip v-if="m.client_name" :name="m.client_name" :id="m.client_id" size="sm" />
                 <template v-if="m.project_name">

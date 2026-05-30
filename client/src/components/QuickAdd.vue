@@ -13,6 +13,7 @@ const toast = useToastStore();
 
 const open = ref(false);
 const title = ref('');
+const subject = ref('');
 const date = ref('');
 const location = ref('video');
 const clientId = ref('');
@@ -38,6 +39,7 @@ async function show() {
   open.value = true;
   if (settings.sound) sounds.whoosh();
   title.value = '';
+  subject.value = '';
   date.value = nowLocal();
   location.value = 'video';
   clientId.value = '';
@@ -56,6 +58,7 @@ async function submit() {
   try {
     const m = await meetings.create({
       title: title.value.trim(),
+      subject: subject.value.trim() || null,
       client_id: clientId.value || null,
       project_id: projectId.value || null,
       location: location.value || null,
@@ -110,6 +113,11 @@ defineExpose({ show, hide });
             required
             placeholder="Title…"
             class="w-full px-4 py-2 text-xl font-serif bg-transparent focus:outline-none placeholder-slate-warm/50"
+          />
+          <input
+            v-model="subject"
+            placeholder="Subject — what's it about?"
+            class="w-full px-4 pb-2 text-sm bg-transparent focus:outline-none placeholder-slate-warm/50 text-slate-warm"
           />
 
           <div class="px-4 py-2 border-t border-sand grid grid-cols-2 gap-2 text-sm">
