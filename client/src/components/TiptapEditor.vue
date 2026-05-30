@@ -26,14 +26,63 @@ async function uploadImage(file) {
   return data.url;
 }
 
-async function insertImage(file) {
-  if (!file || !file.type?.startsWith('image/')) return;
+// Browsers hand us all sorts of clipboard image types (macOS often gives
+// image/tiff, Windows gives image/bmp). The server only stores web-renderable
+// formats, so re-encode anything unusual to PNG via canvas first.
+const SAFE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+async function toUploadable(file) {
+  if (SAFE_TYPES.has(file.type)) return file;
   try {
-    const url = await uploadImage(file);
+    const url = URL.createObjectURL(file);
+    // document.createElement, NOT `new Image()` — the Tiptap Image import shadows it.
+    const el = document.createElement('img');
+    await new Promise((res, rej) => { el.onload = res; el.onerror = rej; el.src = url; });
+    const canvas = document.createElement('canvas');
+    canvas.width = el.naturalWidth || 800;
+    canvas.height = el.naturalHeight || 600;
+    canvas.getContext('2d').drawImage(el, 0, 0);
+    URL.revokeObjectURL(url);
+    const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+    if (blob) return new File([blob], 'image.png', { type: 'image/png' });
+  } catch { /* fall through — server may still accept svg/avif */ }
+  return file;
+}
+
+async function insertImage(file) {
+  if (!file) return;
+  const toastId = toast.info('Uploading image…', { ttl: 0 });
+  try {
+    const uploadable = await toUploadable(file);
+    const url = await uploadImage(uploadable);
     editor.value?.chain().focus().setImage({ src: url }).run();
-  } catch {
-    toast.error('Image upload failed');
+    toast.dismiss(toastId);
+  } catch (e) {
+    toast.dismiss(toastId);
+    toast.error(e?.response?.data?.error || 'Image upload failed');
   }
+}
+
+// Pull every image File out of a clipboard/drag DataTransfer, browser-safely.
+// (DataTransferItemList is NOT iterable with for...of in Safari — use indexes.)
+function imageFilesFrom(dt) {
+  if (!dt) return [];
+  const out = [];
+  if (dt.items && dt.items.length) {
+    for (let i = 0; i < dt.items.length; i++) {
+      const it = dt.items[i];
+      if (it.kind === 'file' && it.type && it.type.indexOf('image/') === 0) {
+        const f = it.getAsFile();
+        if (f) out.push(f);
+      }
+    }
+  }
+  if (!out.length && dt.files && dt.files.length) {
+    for (let i = 0; i < dt.files.length; i++) {
+      const f = dt.files[i];
+      if (f.type && f.type.indexOf('image/') === 0) out.push(f);
+    }
+  }
+  return out;
 }
 
 function pickImage() { fileInput.value?.click(); }
@@ -115,25 +164,15 @@ const editor = useEditor({
     },
     // Paste an image straight from the clipboard → upload → insert.
     handlePaste: (view, event) => {
-      const items = event.clipboardData?.items;
-      if (!items) return false;
-      for (const item of items) {
-        if (item.type?.startsWith('image/')) {
-          const file = item.getAsFile();
-          if (file) {
-            event.preventDefault();
-            insertImage(file);
-            return true;
-          }
-        }
-      }
-      return false;
+      const imgs = imageFilesFrom(event.clipboardData);
+      if (!imgs.length) return false;
+      event.preventDefault();
+      imgs.forEach(insertImage);
+      return true;
     },
     // Drag-and-drop image files.
     handleDrop: (view, event) => {
-      const files = event.dataTransfer?.files;
-      if (!files?.length) return false;
-      const imgs = [...files].filter((f) => f.type?.startsWith('image/'));
+      const imgs = imageFilesFrom(event.dataTransfer);
       if (!imgs.length) return false;
       event.preventDefault();
       imgs.forEach(insertImage);
