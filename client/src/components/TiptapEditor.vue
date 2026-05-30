@@ -170,8 +170,16 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
 .tp-prose h3 { font-family: theme('fontFamily.serif'); font-size: 1.125rem; margin: 0.5rem 0 0.25rem; }
 .tp-prose p { line-height: 1.6; margin: 0.25rem 0; }
 .tp-prose ul, .tp-prose ol { padding-left: 1.5rem; margin: 0.25rem 0; }
+/* Bullet lists step through markers by depth, like a real outline. */
 .tp-prose ul { list-style: disc; }
+.tp-prose ul ul { list-style: circle; }
+.tp-prose ul ul ul { list-style: square; }
+.tp-prose ul ul ul ul { list-style: disc; }
+/* Ordered lists step through number → letter → roman. */
 .tp-prose ol { list-style: decimal; }
+.tp-prose ol ol { list-style: lower-alpha; }
+.tp-prose ol ol ol { list-style: lower-roman; }
+.tp-prose ol ol ol ol { list-style: decimal; }
 .tp-prose a { color: theme('colors.terracotta'); text-decoration: underline; }
 .tp-prose ul[data-type="taskList"] { list-style: none; padding-left: 0; }
 .tp-prose ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; }
