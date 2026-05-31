@@ -6,8 +6,30 @@ import EmptyState from '../components/EmptyState.vue';
 import Skeleton from '../components/Skeleton.vue';
 import MicButton from '../components/MicButton.vue';
 import { useListNav } from '../composables/useListNav.js';
+import { exportNotesMarkdown } from '../utils/exportNote.js';
+import { useToastStore } from '../stores/toast.js';
 
+const toast = useToastStore();
+const exporting = ref(false);
 const createInput = ref(null);
+
+async function exportAll() {
+  if (!filtered.value.length || exporting.value) return;
+  exporting.value = true;
+  const tid = toast.info('Exporting notes…', { ttl: 0 });
+  try {
+    // Fetch full bodies (the list payload already has body, but be safe).
+    const full = await Promise.all(filtered.value.map((n) => api.get(n.id)));
+    await exportNotesMarkdown(full);
+    toast.dismiss(tid);
+    toast.success(`Exported ${full.length} note${full.length === 1 ? '' : 's'}`);
+  } catch {
+    toast.dismiss(tid);
+    toast.error('Export failed');
+  } finally {
+    exporting.value = false;
+  }
+}
 
 const router = useRouter();
 const items = ref([]);
@@ -68,9 +90,17 @@ onMounted(load);
 
 <template>
   <div class="max-w-4xl space-y-5">
-    <header class="flex items-baseline justify-between">
+    <header class="flex items-baseline justify-between gap-3">
       <h1 class="text-3xl font-serif text-ink">Notes</h1>
-      <span class="text-sm text-slate-warm">{{ items.length }}</span>
+      <div class="flex items-center gap-3">
+        <button
+          v-if="filtered.length"
+          @click="exportAll"
+          :disabled="exporting"
+          class="text-sm text-slate-warm hover:text-ink disabled:opacity-50"
+        >Export all</button>
+        <span class="text-sm text-slate-warm tabular-nums">{{ items.length }}</span>
+      </div>
     </header>
 
     <form @submit.prevent="create" class="card flex items-center gap-3 py-2.5 px-4">
