@@ -50,12 +50,12 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { title, body, tags } = req.body || {};
+    const { title, body, tags, layout } = req.body || {};
     if (!title) return res.status(400).json({ error: 'title required' });
     const { rows } = await query(
-      `INSERT INTO notes (workspace_id, title, body, tags)
-       VALUES ($1, $2, $3, COALESCE($4, '{}'::text[])) RETURNING *`,
-      [req.workspaceId, title, body || null, Array.isArray(tags) ? tags : null],
+      `INSERT INTO notes (workspace_id, title, body, tags, layout)
+       VALUES ($1, $2, $3, COALESCE($4, '{}'::text[]), COALESCE($5, 'doc')) RETURNING *`,
+      [req.workspaceId, title, body || null, Array.isArray(tags) ? tags : null, layout || null],
     );
     res.status(201).json(rows[0]);
   } catch (e) { next(e); }
@@ -63,14 +63,15 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
   try {
-    const { title, body, tags } = req.body || {};
+    const { title, body, tags, layout } = req.body || {};
     const { rows } = await query(
       `UPDATE notes SET
-         title = COALESCE($1, title),
-         body  = $2,
-         tags  = COALESCE($3, tags)
-       WHERE id = $4 AND workspace_id = $5 RETURNING *`,
-      [title, body, Array.isArray(tags) ? tags : null, req.params.id, req.workspaceId],
+         title  = COALESCE($1, title),
+         body   = $2,
+         tags   = COALESCE($3, tags),
+         layout = COALESCE($4, layout)
+       WHERE id = $5 AND workspace_id = $6 RETURNING *`,
+      [title, body, Array.isArray(tags) ? tags : null, layout || null, req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);

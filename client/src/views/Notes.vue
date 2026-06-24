@@ -143,8 +143,12 @@ onMounted(load);
         @click="navigate"
         :class="['card cursor-pointer hover:border-slate-warm/40 transition-colors block', selectedId === n.id && 'ring-1 ring-terracotta/40']"
       >
-        <div class="font-medium text-ink truncate mb-1">{{ n.title }}</div>
-        <p class="text-sm text-slate-warm line-clamp-3 mb-3">{{ stripHtml(n.body) || '—' }}</p>
+        <div class="font-medium text-ink truncate mb-1 flex items-center gap-2">
+          <span class="truncate">{{ n.title }}</span>
+          <span v-if="n.layout === 'board'" class="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-sand text-slate-warm">▦ board</span>
+        </div>
+        <p v-if="n.layout !== 'board'" class="text-sm text-slate-warm line-clamp-3 mb-3">{{ stripHtml(n.body) || '—' }}</p>
+        <p v-else class="text-sm text-slate-warm mb-3">Board</p>
         <div class="flex items-center justify-between gap-3">
           <div class="flex items-center gap-1 flex-wrap">
             <span v-for="t in n.tags" :key="t" class="text-xs px-1.5 py-0.5 rounded bg-sand text-ink">#{{ t }}</span>

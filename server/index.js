@@ -19,6 +19,7 @@ import savedViewsRoutes from './routes/savedViews.js';
 import workspacesRoutes from './routes/workspaces.js';
 import todosRoutes from './routes/todos.js';
 import uploadsRoutes from './routes/uploads.js';
+import boardsRoutes from './routes/boards.js';
 import { workspaceScope } from './middleware/workspace.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -64,6 +65,9 @@ app.use('/api/todos',        requireAuth, todosRoutes);
 
 // Image attachments — global, auth-protected.
 app.use('/api/uploads',      requireAuth, uploadsRoutes);
+
+// Boards (Trello-style) attached to notes/meetings — workspace-scoped.
+app.use('/api/boards',       requireAuth, workspaceScope, boardsRoutes);
 
 // In production, serve the built client from /client/dist. SPA fallback: any
 // non-/api request goes to index.html so vue-router can handle the route.

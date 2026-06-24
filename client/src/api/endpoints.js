@@ -67,3 +67,14 @@ export const todos = {
   remove: (id) => api.delete(`/todos/${id}`),
   restore: (id) => api.post(`/todos/${id}/restore`).then((r) => r.data),
 };
+
+export const boards = {
+  get: (parentType, parentId) => api.get(`/boards/${parentType}/${parentId}`).then((r) => r.data),
+  addList: (boardId, title) => api.post(`/boards/${boardId}/lists`, { title }).then((r) => r.data),
+  renameList: (listId, title) => api.put(`/boards/lists/${listId}`, { title }).then((r) => r.data),
+  removeList: (listId) => api.delete(`/boards/lists/${listId}`),
+  addCard: (listId, title) => api.post(`/boards/lists/${listId}/cards`, { title }).then((r) => r.data),
+  updateCard: (cardId, body) => api.put(`/boards/cards/${cardId}`, body).then((r) => r.data),
+  removeCard: (cardId) => api.delete(`/boards/cards/${cardId}`),
+  arrange: (boardId, payload) => api.put(`/boards/${boardId}/arrange`, payload).then((r) => r.data),
+};

@@ -3,6 +3,7 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
 import { notes } from '../api/endpoints.js';
 import TiptapEditor from '../components/TiptapEditor.vue';
+import NoteBoard from '../components/NoteBoard.vue';
 import TagPicker from '../components/TagPicker.vue';
 import PinButton from '../components/PinButton.vue';
 import SaveStatus from '../components/SaveStatus.vue';
@@ -89,6 +90,17 @@ function fmtDate(d) {
   return new Date(d).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+async function setLayout(layout) {
+  if (!draft.value || draft.value.layout === layout) return;
+  draft.value.layout = layout;
+  try {
+    await notes.update(route.params.id, { layout });
+    original.value = { ...original.value, layout };
+  } catch {
+    toast.error('Failed to switch layout');
+  }
+}
+
 onMounted(load);
 watch(() => route.params.id, load);
 </script>
@@ -120,9 +132,16 @@ watch(() => route.params.id, load);
       class="w-full text-3xl font-serif text-ink bg-transparent border-none focus:outline-none focus:ring-0 px-0"
     />
 
-    <TagPicker entity-type="note" :entity-id="route.params.id" :initial="original.universal_tags || []" />
+    <div class="flex items-center gap-3 flex-wrap">
+      <TagPicker entity-type="note" :entity-id="route.params.id" :initial="original.universal_tags || []" />
+      <div class="ml-auto flex items-center gap-1 text-sm">
+        <button @click="setLayout('doc')" :class="['px-2.5 py-1 rounded', draft.layout !== 'board' ? 'bg-sand text-ink' : 'text-slate-warm hover:text-ink']">Doc</button>
+        <button @click="setLayout('board')" :class="['px-2.5 py-1 rounded', draft.layout === 'board' ? 'bg-sand text-ink' : 'text-slate-warm hover:text-ink']">Board</button>
+      </div>
+    </div>
 
-    <TiptapEditor v-model="draft.body" min-height="420px" max-height="68vh" />
+    <TiptapEditor v-if="draft.layout !== 'board'" v-model="draft.body" min-height="420px" max-height="68vh" />
+    <NoteBoard v-else parent-type="note" :parent-id="route.params.id" />
 
     <p class="text-xs text-slate-warm">Created {{ fmtDate(original.created_at) }}</p>
   </div>

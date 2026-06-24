@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
 import { meetings, clients, projects } from '../api/endpoints.js';
 import TiptapEditor from '../components/TiptapEditor.vue';
+import NoteBoard from '../components/NoteBoard.vue';
 import ActionItemList from '../components/ActionItemList.vue';
 import TagPicker from '../components/TagPicker.vue';
 import PinButton from '../components/PinButton.vue';
@@ -25,7 +26,7 @@ const allClients = ref([]);
 const allProjects = ref([]);
 const loading = ref(true);
 
-const TABS = ['pre', 'during', 'after'];
+const TABS = ['pre', 'during', 'after', 'board'];
 const tab = computed({
   get: () => TABS.includes(route.query.tab) ? route.query.tab : 'pre',
   set: (v) => router.replace({ query: { ...route.query, tab: v === 'pre' ? undefined : v } }),
@@ -213,6 +214,11 @@ watch(() => route.params.id, load);
         After
         <span v-if="openActionItems" class="inline-flex items-center justify-center text-xs px-1.5 rounded-full bg-terracotta/15 text-terracotta">{{ openActionItems }}</span>
       </button>
+      <button
+        @click="tab = 'board'"
+        :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                 tab === 'board' ? 'border-terracotta text-ink' : 'border-transparent text-slate-warm hover:text-ink']"
+      >Board</button>
     </div>
 
     <section v-show="tab === 'pre'">
@@ -238,6 +244,11 @@ watch(() => route.params.id, load);
           @update:items="actionItems = $event"
         />
       </div>
+    </section>
+
+    <section v-show="tab === 'board'">
+      <p class="text-sm text-slate-warm mb-2">Drag cards between columns.</p>
+      <NoteBoard parent-type="meeting" :parent-id="route.params.id" />
     </section>
 
     <p class="text-xs text-slate-warm">Created {{ fmtDate(original.created_at) }}</p>
