@@ -37,18 +37,23 @@ async function fetchBoard(boardId) {
   return { lists: [...byList.values()] };
 }
 
-// GET (or create) the board for a parent note/meeting.
+// Meetings split into three independent boards (one per phase); notes use ''.
+const VALID_SECTIONS = new Set(['', 'pre', 'during', 'after']);
+
+// GET (or create) the board for a parent note/meeting, optionally a named section.
 router.get('/:parent_type/:parent_id', async (req, res, next) => {
   try {
     const { parent_type, parent_id } = req.params;
+    const section = req.query.section || '';
     if (!['note', 'meeting'].includes(parent_type)) return res.status(400).json({ error: 'invalid parent_type' });
+    if (!VALID_SECTIONS.has(section)) return res.status(400).json({ error: 'invalid section' });
     if (!(await parentExists(parent_type, parent_id, req.workspaceId))) {
       return res.status(404).json({ error: 'parent not found' });
     }
 
     let board = (await query(
-      'SELECT * FROM boards WHERE parent_type = $1 AND parent_id = $2 AND workspace_id = $3',
-      [parent_type, parent_id, req.workspaceId],
+      'SELECT * FROM boards WHERE parent_type = $1 AND parent_id = $2 AND section = $3 AND workspace_id = $4',
+      [parent_type, parent_id, section, req.workspaceId],
     )).rows[0];
 
     if (!board) {
@@ -56,8 +61,8 @@ router.get('/:parent_type/:parent_id', async (req, res, next) => {
       try {
         await client.query('BEGIN');
         board = (await client.query(
-          'INSERT INTO boards (workspace_id, parent_type, parent_id) VALUES ($1, $2, $3) RETURNING *',
-          [req.workspaceId, parent_type, parent_id],
+          'INSERT INTO boards (workspace_id, parent_type, parent_id, section) VALUES ($1, $2, $3, $4) RETURNING *',
+          [req.workspaceId, parent_type, parent_id, section],
         )).rows[0];
         for (let i = 0; i < DEFAULT_LISTS.length; i++) {
           await client.query('INSERT INTO board_lists (board_id, title, sort_order) VALUES ($1, $2, $3)', [board.id, DEFAULT_LISTS[i], i]);

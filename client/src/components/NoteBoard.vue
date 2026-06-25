@@ -7,6 +7,7 @@ import { useToastStore } from '../stores/toast.js';
 const props = defineProps({
   parentType: { type: String, required: true }, // 'note' | 'meeting'
   parentId: { type: [Number, String], required: true },
+  section: { type: String, default: '' },       // '' for notes; 'pre'|'during'|'after' for meeting phases
 });
 
 const toast = useToastStore();
@@ -29,12 +30,12 @@ const COLORS = [
 
 async function load() {
   loading.value = true;
-  try { board.value = await api.get(props.parentType, props.parentId); }
+  try { board.value = await api.get(props.parentType, props.parentId, props.section); }
   catch { board.value = null; }
   finally { loading.value = false; }
 }
 onMounted(load);
-watch(() => [props.parentType, props.parentId], load);
+watch(() => [props.parentType, props.parentId, props.section], load);
 
 function buildArrange() {
   return {

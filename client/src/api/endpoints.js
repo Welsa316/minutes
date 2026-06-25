@@ -69,7 +69,8 @@ export const todos = {
 };
 
 export const boards = {
-  get: (parentType, parentId) => api.get(`/boards/${parentType}/${parentId}`).then((r) => r.data),
+  get: (parentType, parentId, section = '') =>
+    api.get(`/boards/${parentType}/${parentId}`, { params: section ? { section } : {} }).then((r) => r.data),
   addList: (boardId, title) => api.post(`/boards/${boardId}/lists`, { title }).then((r) => r.data),
   renameList: (listId, title) => api.put(`/boards/lists/${listId}`, { title }).then((r) => r.data),
   removeList: (listId) => api.delete(`/boards/lists/${listId}`),

@@ -91,20 +91,27 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
   try {
-    const { title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary } = req.body || {};
+    const {
+      title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary,
+      pre_layout, during_layout, after_layout,
+    } = req.body || {};
     const { rows } = await query(
       `UPDATE meetings SET
-         title       = COALESCE($1, title),
-         subject     = $2,
-         client_id   = $3,
-         project_id  = $4,
-         date        = $5,
-         location    = $6,
-         pre_notes   = $7,
-         live_notes  = $8,
-         summary     = $9
-       WHERE id = $10 AND workspace_id = $11 RETURNING *`,
-      [title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary, req.params.id, req.workspaceId],
+         title         = COALESCE($1, title),
+         subject       = $2,
+         client_id     = $3,
+         project_id    = $4,
+         date          = $5,
+         location      = $6,
+         pre_notes     = $7,
+         live_notes    = $8,
+         summary       = $9,
+         pre_layout    = COALESCE($10, pre_layout),
+         during_layout = COALESCE($11, during_layout),
+         after_layout  = COALESCE($12, after_layout)
+       WHERE id = $13 AND workspace_id = $14 RETURNING *`,
+      [title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary,
+       pre_layout ?? null, during_layout ?? null, after_layout ?? null, req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);

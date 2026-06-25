@@ -4,6 +4,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router';
 import { meetings, clients, projects } from '../api/endpoints.js';
 import TiptapEditor from '../components/TiptapEditor.vue';
 import NoteBoard from '../components/NoteBoard.vue';
+import LayoutToggle from '../components/LayoutToggle.vue';
 import ActionItemList from '../components/ActionItemList.vue';
 import TagPicker from '../components/TagPicker.vue';
 import PinButton from '../components/PinButton.vue';
@@ -26,7 +27,7 @@ const allClients = ref([]);
 const allProjects = ref([]);
 const loading = ref(true);
 
-const TABS = ['pre', 'during', 'after', 'board'];
+const TABS = ['pre', 'during', 'after'];
 const tab = computed({
   get: () => TABS.includes(route.query.tab) ? route.query.tab : 'pre',
   set: (v) => router.replace({ query: { ...route.query, tab: v === 'pre' ? undefined : v } }),
@@ -214,27 +215,34 @@ watch(() => route.params.id, load);
         After
         <span v-if="openActionItems" class="inline-flex items-center justify-center text-xs px-1.5 rounded-full bg-terracotta/15 text-terracotta">{{ openActionItems }}</span>
       </button>
-      <button
-        @click="tab = 'board'"
-        :class="['px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-                 tab === 'board' ? 'border-terracotta text-ink' : 'border-transparent text-slate-warm hover:text-ink']"
-      >Board</button>
     </div>
 
     <section v-show="tab === 'pre'">
-      <p class="text-sm text-slate-warm mb-2">Prep notes, questions, agenda.</p>
-      <TiptapEditor v-model="draft.pre_notes" min-height="320px" max-height="62vh" />
+      <div class="flex items-center justify-between gap-3 mb-2">
+        <p class="text-sm text-slate-warm">{{ draft.pre_layout === 'board' ? 'Drag cards between columns.' : 'Prep notes, questions, agenda.' }}</p>
+        <LayoutToggle v-model="draft.pre_layout" />
+      </div>
+      <TiptapEditor v-if="draft.pre_layout !== 'board'" v-model="draft.pre_notes" min-height="320px" max-height="62vh" />
+      <NoteBoard v-else parent-type="meeting" :parent-id="route.params.id" section="pre" />
     </section>
 
     <section v-show="tab === 'during'">
-      <p class="text-sm text-slate-warm mb-2">Live notes during the meeting.</p>
-      <TiptapEditor v-model="draft.live_notes" min-height="380px" max-height="64vh" />
+      <div class="flex items-center justify-between gap-3 mb-2">
+        <p class="text-sm text-slate-warm">{{ draft.during_layout === 'board' ? 'Drag cards between columns.' : 'Live notes during the meeting.' }}</p>
+        <LayoutToggle v-model="draft.during_layout" />
+      </div>
+      <TiptapEditor v-if="draft.during_layout !== 'board'" v-model="draft.live_notes" min-height="380px" max-height="64vh" />
+      <NoteBoard v-else parent-type="meeting" :parent-id="route.params.id" section="during" />
     </section>
 
     <section v-show="tab === 'after'" class="space-y-6">
       <div>
-        <p class="text-sm text-slate-warm mb-2">Summary.</p>
-        <TiptapEditor v-model="draft.summary" min-height="240px" max-height="48vh" />
+        <div class="flex items-center justify-between gap-3 mb-2">
+          <p class="text-sm text-slate-warm">{{ draft.after_layout === 'board' ? 'Drag cards between columns.' : 'Summary.' }}</p>
+          <LayoutToggle v-model="draft.after_layout" />
+        </div>
+        <TiptapEditor v-if="draft.after_layout !== 'board'" v-model="draft.summary" min-height="240px" max-height="48vh" />
+        <NoteBoard v-else parent-type="meeting" :parent-id="route.params.id" section="after" />
       </div>
       <div>
         <h3 class="font-serif text-lg text-ink mb-2">Action items</h3>
@@ -244,11 +252,6 @@ watch(() => route.params.id, load);
           @update:items="actionItems = $event"
         />
       </div>
-    </section>
-
-    <section v-show="tab === 'board'">
-      <p class="text-sm text-slate-warm mb-2">Drag cards between columns.</p>
-      <NoteBoard parent-type="meeting" :parent-id="route.params.id" />
     </section>
 
     <p class="text-xs text-slate-warm">Created {{ fmtDate(original.created_at) }}</p>
