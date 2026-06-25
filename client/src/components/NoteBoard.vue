@@ -94,27 +94,47 @@ async function removeList(list) {
 }
 
 function openCard(card) { editing.value = { ...card }; }
-function closeCard() { editing.value = null; }
 
-async function saveCard() {
+// Reflect a card change into the board model in place.
+function patchBoardCard(id, patch) {
+  for (const l of board.value.lists) {
+    const i = l.cards.findIndex((x) => x.id === id);
+    if (i >= 0) { l.cards.splice(i, 1, { ...l.cards[i], ...patch }); return; }
+  }
+}
+
+// A color label applies on click and saves immediately — it shouldn't need a
+// Save trip (everything else in the app autosaves).
+async function setColor(hex) {
   const c = editing.value;
+  if (!c) return;
+  c.color = hex;
+  patchBoardCard(c.id, { color: hex });
+  if (String(c.id).startsWith('tmp-')) return;
+  try { await api.updateCard(c.id, { color: hex }); }
+  catch { toast.error('Failed to save label'); }
+}
+
+// Save title/body/color and close. ANY dismissal (Done, backdrop, ×, Esc)
+// saves — there's no discard, matching autosave everywhere else.
+async function commitCard() {
+  const c = editing.value;
+  if (!c) return;
+  editing.value = null;
+  if (String(c.id).startsWith('tmp-')) return;
   try {
-    const real = await api.updateCard(c.id, { title: c.title.trim() || 'Untitled', body: c.body || null, color: c.color || null });
-    for (const l of board.value.lists) {
-      const i = l.cards.findIndex((x) => x.id === c.id);
-      if (i >= 0) l.cards.splice(i, 1, { ...l.cards[i], ...real });
-    }
-    editing.value = null;
-  } catch { toast.error('Failed to save card'); }
+    const real = await api.updateCard(c.id, { title: c.title.trim() || 'Untitled', body: c.body ?? null, color: c.color ?? null });
+    patchBoardCard(c.id, real);
+  } catch { toast.error('Failed to save card'); load(); }
 }
 
 async function deleteCard() {
   const c = editing.value;
+  editing.value = null;
   for (const l of board.value.lists) {
     const i = l.cards.findIndex((x) => x.id === c.id);
     if (i >= 0) l.cards.splice(i, 1);
   }
-  editing.value = null;
   try { await api.removeCard(c.id); } catch { toast.error('Failed'); load(); }
 }
 </script>
@@ -191,8 +211,8 @@ async function deleteCard() {
     <!-- Card editor modal -->
     <Teleport to="body">
       <Transition name="cm">
-        <div v-if="editing" class="fixed inset-0 z-50 flex items-start justify-center pt-[14vh] px-4" @mousedown.self="closeCard">
-          <div class="absolute inset-0 bg-ink/40 backdrop-blur-sm" @click="closeCard" />
+        <div v-if="editing" class="fixed inset-0 z-50 flex items-start justify-center pt-[14vh] px-4" @mousedown.self="commitCard" @keydown.escape="commitCard">
+          <div class="absolute inset-0 bg-ink/40 backdrop-blur-sm" @click="commitCard" />
           <div class="relative w-full max-w-lg bg-surface border border-sand rounded-xl shadow-2xl overflow-hidden">
             <div v-if="editing.color" class="h-1.5" :style="{ background: '#' + editing.color }" />
             <div class="p-4 space-y-4">
@@ -213,7 +233,7 @@ async function deleteCard() {
                     v-for="c in COLORS"
                     :key="c.name"
                     type="button"
-                    @click="editing.color = c.hex"
+                    @click="setColor(c.hex)"
                     :title="c.name"
                     :class="['h-7 w-7 rounded-full border-2 transition-transform hover:scale-110', editing.color === c.hex ? 'border-ink' : 'border-transparent']"
                     :style="{ background: c.hex ? '#' + c.hex : 'transparent', boxShadow: c.hex ? 'none' : 'inset 0 0 0 1px rgb(var(--c-sand))' }"
@@ -225,10 +245,7 @@ async function deleteCard() {
             </div>
             <div class="px-4 py-3 border-t border-sand flex items-center justify-between">
               <button @click="deleteCard" class="text-sm text-slate-warm hover:text-terracotta">Delete</button>
-              <div class="flex items-center gap-2">
-                <button @click="closeCard" class="btn-ghost text-sm">Cancel</button>
-                <button @click="saveCard" class="btn-primary text-sm">Save</button>
-              </div>
+              <button @click="commitCard" class="btn-primary text-sm">Done</button>
             </div>
           </div>
         </div>
