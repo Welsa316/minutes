@@ -8,6 +8,7 @@ import { useWorkspaceStore } from '../stores/workspace.js';
 import { useUiStore } from '../stores/ui.js';
 import { clientColor, initials } from '../utils/colors.js';
 import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
+import ModuleManager from './ModuleManager.vue';
 
 defineEmits(['logout']);
 
@@ -95,6 +96,13 @@ watch(() => ws.activeId, loadPinned);
           ]"
         >{{ l.label }}</a>
       </RouterLink>
+
+      <p v-if="wsLinks.length === 1" class="px-3 py-1 text-xs text-slate-warm/80 leading-snug">
+        No modules here yet. Add one to start.
+      </p>
+
+      <!-- Add/remove modules for this workspace -->
+      <ModuleManager class="mt-0.5" />
 
       <!-- Global section (workspace-independent) -->
       <div class="pt-3">

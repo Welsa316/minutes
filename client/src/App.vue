@@ -25,16 +25,16 @@ async function bootstrap() {
 onMounted(bootstrap);
 watch(() => auth.user, bootstrap);
 
-// When the active workspace flips, navigate to its first available section so
-// the user never lands on a route that the workspace doesn't enable.
+// When the active workspace flips, only bounce off a module's *list* page if
+// that module isn't enabled here — detail pages, the global dashboard, and
+// Todos stay put. The dashboard is global, so it's always a safe landing spot.
+const MODULE_LIST_PATHS = ['/clients', '/projects', '/meetings', '/notes', '/tags'];
 watch(() => ws.activeId, () => {
   if (!ws.active) return;
   const sections = ws.active.sections || [];
   const path = router.currentRoute.value.path;
-  const isRoot = path === '/';
-  const isOnEnabled = sections.some((s) => path === `/${s}` || path.startsWith(`/${s}/`));
-  if (!isRoot && !isOnEnabled) {
-    router.replace(sections.includes('notes') ? '/notes' : '/');
+  if (MODULE_LIST_PATHS.includes(path) && !sections.includes(path.slice(1))) {
+    router.replace('/');
   }
 });
 </script>

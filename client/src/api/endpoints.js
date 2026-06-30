@@ -25,6 +25,11 @@ export const actionItems = {
 export const search = (q) =>
   api.get('/search', { params: { q } }).then((r) => r.data);
 
+// Global — spans every workspace (not workspace-scoped).
+export const dashboard = {
+  get: () => api.get('/dashboard').then((r) => r.data),
+};
+
 export const tags = {
   list: () => api.get('/tags').then((r) => r.data),
   create: (body) => api.post('/tags', body).then((r) => r.data),

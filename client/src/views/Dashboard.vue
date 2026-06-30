@@ -1,14 +1,18 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { RouterLink } from 'vue-router';
-import { meetings, projects, notes, clients } from '../api/endpoints.js';
+import { RouterLink, useRouter } from 'vue-router';
+import { dashboard } from '../api/endpoints.js';
 import { useAuthStore } from '../stores/auth.js';
+import { useWorkspaceStore } from '../stores/workspace.js';
 import Skeleton from '../components/Skeleton.vue';
 import CountUp from '../components/CountUp.vue';
 import Heatmap from '../components/Heatmap.vue';
 import ClientChip from '../components/ClientChip.vue';
 
 const auth = useAuthStore();
+const ws = useWorkspaceStore();
+const router = useRouter();
+
 const upcoming = ref([]);
 const active = ref([]);
 const recent = ref([]);
@@ -26,7 +30,10 @@ const greeting = computed(() => {
   return `Late night, ${name}`;
 });
 
-// "On this day" — meetings from exactly 1, 2, 3 years ago.
+// More than one workspace in play? Then the little workspace tags are useful.
+const multiWorkspace = computed(() => ws.list.length > 1);
+
+// "On this day" — meetings from exactly 1, 2, 3 years ago (across all workspaces).
 const onThisDay = computed(() => {
   const today = new Date();
   const out = [];
@@ -46,24 +53,20 @@ const onThisDay = computed(() => {
 });
 
 async function load() {
-  const [m, p, n, c, allM] = await Promise.all([
-    meetings.list({ upcoming: true }),
-    projects.list({ status: 'active' }),
-    notes.list(),
-    clients.list(),
-    meetings.list(),
-  ]);
-  upcoming.value = m.slice(0, 6);
-  active.value = p.slice(0, 6);
-  recent.value = n.slice(0, 6);
-  allMeetings.value = allM;
-  totals.value = {
-    clients: c.length,
-    projects: p.length,
-    meetings: allM.length,
-    notes: n.length,
-  };
+  const d = await dashboard.get();
+  upcoming.value = d.upcoming;
+  active.value = d.activeProjects;
+  recent.value = d.recentNotes;
+  allMeetings.value = d.allMeetings;
+  totals.value = d.totals;
   loading.value = false;
+}
+
+// The dashboard is global, so an item may live in a different workspace than the
+// active one. Flip into its workspace before opening so the detail page loads.
+function open(kind, item) {
+  if (item.workspace_id && item.workspace_id !== ws.activeId) ws.setActive(item.workspace_id);
+  router.push(`/${kind}/${item.id}`);
 }
 
 function fmtDate(d) {
@@ -101,10 +104,18 @@ onMounted(load);
           </div>
           <ul v-if="upcoming.length" class="space-y-2">
             <li v-for="m in upcoming" :key="m.id">
-              <RouterLink :to="`/meetings/${m.id}`" class="block group">
+              <button @click="open('meetings', m)" class="block w-full text-left group">
                 <div class="text-sm font-medium text-ink truncate group-hover:text-terracotta">{{ m.title }}</div>
-                <div class="text-xs text-slate-warm">{{ fmtDate(m.date) }}<template v-if="m.client_name"> · {{ m.client_name }}</template></div>
-              </RouterLink>
+                <div class="text-xs text-slate-warm flex items-center gap-1.5">
+                  <span
+                    v-if="multiWorkspace"
+                    class="inline-block h-2 w-2 rounded-full shrink-0"
+                    :style="{ background: m.workspace_color ? '#' + m.workspace_color : 'rgb(var(--c-slate-warm))' }"
+                    :title="m.workspace_name"
+                  />
+                  <span class="truncate">{{ fmtDate(m.date) }}<template v-if="m.client_name"> · {{ m.client_name }}</template></span>
+                </div>
+              </button>
             </li>
           </ul>
           <p v-else class="text-sm text-slate-warm">None.</p>
@@ -117,14 +128,23 @@ onMounted(load);
           </div>
           <ul v-if="active.length" class="space-y-2">
             <li v-for="p in active" :key="p.id">
-              <RouterLink :to="`/projects/${p.id}`" class="block group">
+              <button @click="open('projects', p)" class="block w-full text-left group">
                 <div class="text-sm font-medium text-ink truncate group-hover:text-terracotta">{{ p.name }}</div>
-                <div class="text-xs text-slate-warm">
-                  <template v-if="p.client_name">{{ p.client_name }}</template>
-                  <template v-if="p.client_name && p.deadline"> · </template>
-                  <template v-if="p.deadline">due {{ relativeDate(p.deadline) }}</template>
+                <div class="text-xs text-slate-warm flex items-center gap-1.5">
+                  <span
+                    v-if="multiWorkspace"
+                    class="inline-block h-2 w-2 rounded-full shrink-0"
+                    :style="{ background: p.workspace_color ? '#' + p.workspace_color : 'rgb(var(--c-slate-warm))' }"
+                    :title="p.workspace_name"
+                  />
+                  <span class="truncate">
+                    <template v-if="p.client_name">{{ p.client_name }}</template>
+                    <template v-if="p.client_name && p.deadline"> · </template>
+                    <template v-if="p.deadline">due {{ relativeDate(p.deadline) }}</template>
+                    <template v-if="!p.client_name && !p.deadline">—</template>
+                  </span>
                 </div>
-              </RouterLink>
+              </button>
             </li>
           </ul>
           <p v-else class="text-sm text-slate-warm">None.</p>
@@ -137,10 +157,18 @@ onMounted(load);
           </div>
           <ul v-if="recent.length" class="space-y-2">
             <li v-for="n in recent" :key="n.id">
-              <RouterLink :to="`/notes/${n.id}`" class="block group">
+              <button @click="open('notes', n)" class="block w-full text-left group">
                 <div class="text-sm font-medium text-ink truncate group-hover:text-terracotta">{{ n.title }}</div>
-                <div class="text-xs text-slate-warm">{{ relativeDate(n.created_at) }}</div>
-              </RouterLink>
+                <div class="text-xs text-slate-warm flex items-center gap-1.5">
+                  <span
+                    v-if="multiWorkspace"
+                    class="inline-block h-2 w-2 rounded-full shrink-0"
+                    :style="{ background: n.workspace_color ? '#' + n.workspace_color : 'rgb(var(--c-slate-warm))' }"
+                    :title="n.workspace_name"
+                  />
+                  <span class="truncate">{{ relativeDate(n.created_at) }}</span>
+                </div>
+              </button>
             </li>
           </ul>
           <p v-else class="text-sm text-slate-warm">None.</p>
@@ -150,7 +178,7 @@ onMounted(load);
       <section class="card">
         <div class="flex items-baseline justify-between mb-3">
           <h2 class="font-serif text-lg text-ink">Activity</h2>
-          <span class="text-xs text-slate-warm">last 6 months</span>
+          <span class="text-xs text-slate-warm">last 6 months · all workspaces</span>
         </div>
         <Heatmap :events="allMeetings.filter(m => m.date).map(m => ({ date: m.date }))" />
       </section>
@@ -159,11 +187,11 @@ onMounted(load);
         <h2 class="font-serif text-lg text-ink mb-3">On this day</h2>
         <ul class="space-y-2">
           <li v-for="m in onThisDay" :key="`${m.yearsAgo}-${m.id}`">
-            <RouterLink :to="`/meetings/${m.id}`" class="block group flex items-center gap-3">
-              <span class="text-xs text-slate-warm tabular-nums w-20">{{ m.yearsAgo }} year{{ m.yearsAgo === 1 ? '' : 's' }} ago</span>
+            <button @click="open('meetings', m)" class="block w-full text-left group flex items-center gap-3">
+              <span class="text-xs text-slate-warm tabular-nums w-20 shrink-0">{{ m.yearsAgo }} year{{ m.yearsAgo === 1 ? '' : 's' }} ago</span>
               <span class="text-sm font-medium text-ink truncate group-hover:text-terracotta">{{ m.title }}</span>
               <ClientChip v-if="m.client_name" :name="m.client_name" :id="m.client_id" size="sm" :hover="false" />
-            </RouterLink>
+            </button>
           </li>
         </ul>
       </section>

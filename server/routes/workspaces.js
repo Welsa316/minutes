@@ -28,7 +28,7 @@ router.post('/', async (req, res, next) => {
     if (!name?.trim() || !slug?.trim()) return res.status(400).json({ error: 'name and slug required' });
     const { rows } = await query(
       `INSERT INTO workspaces (name, slug, icon, color, sections, sort_order)
-       VALUES ($1, $2, $3, $4, COALESCE($5, '["notes"]'::jsonb),
+       VALUES ($1, $2, $3, $4, COALESCE($5, '[]'::jsonb),
                (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM workspaces))
        RETURNING *`,
       [name.trim(), slug.trim().toLowerCase(), icon || null, color || null, sections ? JSON.stringify(sections) : null],
@@ -44,8 +44,8 @@ router.put('/:id', async (req, res, next) => {
     const { rows } = await query(
       `UPDATE workspaces SET
          name = COALESCE($1, name),
-         icon = $2,
-         color = $3,
+         icon = COALESCE($2, icon),
+         color = COALESCE($3, color),
          sections = COALESCE($4, sections),
          sort_order = COALESCE($5, sort_order)
        WHERE id = $6 RETURNING *`,

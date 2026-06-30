@@ -20,6 +20,7 @@ import workspacesRoutes from './routes/workspaces.js';
 import todosRoutes from './routes/todos.js';
 import uploadsRoutes from './routes/uploads.js';
 import boardsRoutes from './routes/boards.js';
+import dashboardRoutes from './routes/dashboard.js';
 import { workspaceScope } from './middleware/workspace.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -62,6 +63,9 @@ app.use('/api/saved-views',  requireAuth, workspaceScope, savedViewsRoutes);
 
 // Todos are app-global. No workspaceScope.
 app.use('/api/todos',        requireAuth, todosRoutes);
+
+// Dashboard aggregates across ALL workspaces. No workspaceScope.
+app.use('/api/dashboard',    requireAuth, dashboardRoutes);
 
 // Image attachments — global, auth-protected.
 app.use('/api/uploads',      requireAuth, uploadsRoutes);

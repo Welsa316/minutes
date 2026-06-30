@@ -59,8 +59,35 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     return data;
   }
 
+  // Persist a new module set for the active workspace and reflect it locally.
+  async function setSections(sections) {
+    const w = active.value;
+    if (!w) return;
+    const { data } = await api.put(`/workspaces/${w.id}`, { sections });
+    const i = list.value.findIndex((x) => x.id === w.id);
+    if (i >= 0) list.value.splice(i, 1, { ...list.value[i], ...data });
+  }
+
+  // Add/remove a module ("section") from the active workspace. Removing a
+  // module only hides its tab — the data underneath is kept.
+  async function toggleModule(key) {
+    const cur = new Set(active.value?.sections || []);
+    if (cur.has(key)) cur.delete(key); else cur.add(key);
+    await setSections([...cur]);
+  }
+
   // Sync the active workspace into the axios interceptor any time it changes.
   watch(activeId, (v) => setApiWorkspaceId(v), { immediate: true });
 
-  return { list, activeId, active, sections, has, loading, load, setActive, setActiveBySlug, create };
+  return { list, activeId, active, sections, has, loading, load, setActive, setActiveBySlug, create, setSections, toggleModule };
 });
+
+// The module types a workspace can switch on. Todos + Dashboard are global and
+// not listed here. Order is the order they appear in the nav.
+export const MODULES = [
+  { key: 'clients', label: 'Clients' },
+  { key: 'projects', label: 'Projects' },
+  { key: 'meetings', label: 'Meetings' },
+  { key: 'notes', label: 'Notes' },
+  { key: 'tags', label: 'Tags' },
+];
