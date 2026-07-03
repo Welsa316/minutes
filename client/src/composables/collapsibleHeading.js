@@ -1,5 +1,5 @@
 import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 // Makes existing headings foldable. A heading gains a `collapsed` attribute
@@ -78,25 +78,31 @@ export const HeadingFold = Extension.create({
   priority: 1000,
 
   addKeyboardShortcuts() {
-    // Editing inside a collapsed heading would otherwise create the new line
-    // *inside the hidden region* — so it looks like Enter does nothing. Expand
-    // the section first, then split as usual.
-    const expandThenSplit = () => {
+    // Pressing Enter inside a collapsed heading would otherwise create the new
+    // line *inside the hidden region*, so it looks like Enter does nothing (or
+    // only expands). Do it deterministically in one transaction: expand the
+    // section, split at the cursor into a paragraph, and move the cursor into it.
+    const handleEnter = () => {
       const { state } = this.editor;
       const { $from } = state.selection;
       const node = $from.parent;
       if (node.type.name !== 'heading' || !node.attrs.collapsed) return false;
       const headingPos = $from.before();
-      return this.editor
-        .chain()
-        .command(({ tr }) => {
+      const cursor = $from.pos;
+      const paragraph = state.schema.nodes.paragraph;
+      return this.editor.commands.command(({ tr, dispatch }) => {
+        if (dispatch) {
           tr.setNodeMarkup(headingPos, undefined, { ...node.attrs, collapsed: false });
-          return true;
-        })
-        .splitBlock()
-        .run();
+          tr.split(cursor, 1, [{ type: paragraph }]);
+          const landing = tr.mapping.map(cursor);
+          tr.setSelection(TextSelection.near(tr.doc.resolve(landing)));
+          tr.scrollIntoView();
+          dispatch(tr);
+        }
+        return true;
+      });
     };
-    return { Enter: expandThenSplit };
+    return { Enter: handleEnter };
   },
 
   addGlobalAttributes() {
