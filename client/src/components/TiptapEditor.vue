@@ -305,8 +305,9 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
 }
 .tp-prose .folded-hidden { display: none !important; }
 .tp-prose p { line-height: 1.6; margin: 0.25rem 0; }
-/* Bold = brand terracotta (still bold weight) — cover <b> from pasted content too */
-.tp-prose strong, .tp-prose b { color: theme('colors.terracotta'); font-weight: 700; }
+/* Bold = brand terracotta (still bold weight) — cover <b> from pasted content too.
+   !important so it wins over any inline style or specificity surprise. */
+.tp-prose strong, .tp-prose b { color: theme('colors.terracotta') !important; font-weight: 700; }
 .tp-prose ul, .tp-prose ol { padding-left: 1.5rem; margin: 0.25rem 0; }
 /* Bullet lists step through markers by depth, like a real outline. */
 .tp-prose ul { list-style: disc; }

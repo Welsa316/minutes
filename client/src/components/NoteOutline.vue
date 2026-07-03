@@ -35,8 +35,29 @@ const allCollapsed = computed(() => hasHeadings.value && headings.value.every((h
 function jump(h) {
   const ed = props.editor;
   if (!ed) return;
-  const dom = ed.view.nodeDOM(h.pos);
-  if (dom?.scrollIntoView) dom.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Open the target section, plus any collapsed section that hides it, so the
+  // heading is actually visible before we scroll to it.
+  const doc = ed.state.doc;
+  const hs = [];
+  doc.forEach((n, offset) => { if (n.type.name === 'heading') hs.push({ offset, level: n.attrs.level, node: n }); });
+  let tr = ed.state.tr;
+  let changed = false;
+  for (let i = 0; i < hs.length; i++) {
+    const hi = hs[i];
+    if (!hi.node.attrs.collapsed) continue;
+    let end = doc.content.size;
+    for (let j = i + 1; j < hs.length; j++) { if (hs[j].level <= hi.level) { end = hs[j].offset; break; } }
+    // Expand it if it IS the clicked heading, or if it hides the clicked heading.
+    if (hi.offset === h.pos || (hi.offset < h.pos && h.pos < end)) {
+      tr = tr.setNodeMarkup(hi.offset, undefined, { ...hi.node.attrs, collapsed: false });
+      changed = true;
+    }
+  }
+  if (changed) ed.view.dispatch(tr);
+  nextTick(() => {
+    const dom = ed.view.nodeDOM(h.pos);
+    if (dom?.scrollIntoView) dom.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
   activePos.value = h.pos;
   openMobile.value = false;
 }
