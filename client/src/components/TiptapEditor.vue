@@ -11,6 +11,8 @@ import Image from '@tiptap/extension-image';
 import 'tippy.js/dist/tippy.css';
 import { mentionSuggestion, SlashCommand } from '../composables/tiptapSuggestions.js';
 import { Callout } from '../composables/calloutNode.js';
+import { HeadingFold } from '../composables/collapsibleHeading.js';
+import NoteOutline from './NoteOutline.vue';
 import { useSpeech } from '../composables/useSpeech.js';
 import { api } from '../api/index.js';
 import { useToastStore } from '../stores/toast.js';
@@ -110,6 +112,8 @@ const props = defineProps({
   // When set, the content area caps at this height and scrolls internally,
   // so a long note doesn't grow the whole page (toolbar/tabs stay pinned).
   maxHeight: { type: String, default: '' },
+  // Show an auto-built outline rail (jump to / fold sections). For long notes.
+  outline: { type: Boolean, default: false },
 });
 const emit = defineEmits(['update:modelValue']);
 
@@ -144,6 +148,7 @@ const editor = useEditor({
     }),
     SlashCommand,
     Callout,
+    HeadingFold,
     Image.configure({
       inline: false,
       allowBase64: false,
@@ -216,7 +221,13 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
 </script>
 
 <template>
-  <div class="border border-sand rounded-md bg-warm focus-within:ring-2 focus-within:ring-terracotta/40 focus-within:border-terracotta transition-colors">
+  <div :class="outline ? 'flex flex-col lg:flex-row lg:items-start gap-3' : ''">
+    <NoteOutline
+      v-if="outline && editor"
+      :editor="editor"
+      class="lg:order-2 lg:w-48 lg:shrink-0 lg:sticky lg:top-4"
+    />
+    <div class="flex-1 min-w-0 lg:order-1 border border-sand rounded-md bg-warm focus-within:ring-2 focus-within:ring-terracotta/40 focus-within:border-terracotta transition-colors">
     <div v-if="editor" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-sand">
       <button type="button" class="tp-btn" :class="isActive('bold') && 'tp-btn-active'" @click="run(c => c.toggleBold())" title="Bold"><span class="font-bold">B</span></button>
       <button type="button" class="tp-btn" :class="isActive('italic') && 'tp-btn-active'" @click="run(c => c.toggleItalic())" title="Italic"><span class="italic">i</span></button>
@@ -263,6 +274,7 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
       :class="['px-3 py-2.5', maxHeight && 'overflow-y-auto']"
       :style="{ minHeight, maxHeight: maxHeight || undefined }"
     />
+    </div>
   </div>
 </template>
 
@@ -277,6 +289,21 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
 .tp-prose h1 { font-family: theme('fontFamily.serif'); font-size: 1.5rem; margin: 0.75rem 0 0.25rem; }
 .tp-prose h2 { font-family: theme('fontFamily.serif'); font-size: 1.25rem; margin: 0.625rem 0 0.25rem; }
 .tp-prose h3 { font-family: theme('fontFamily.serif'); font-size: 1.125rem; margin: 0.5rem 0 0.25rem; }
+
+/* Collapsible headings: a fold arrow in the gutter; content hidden when folded. */
+.tp-prose .fold-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 0.9em; margin-right: 0.15em; margin-left: -0.05em;
+  font-size: 0.6em; line-height: 1; vertical-align: middle;
+  color: theme('colors.slate-warm'); opacity: 0; cursor: pointer;
+  background: none; border: 0; padding: 0; transition: opacity 120ms ease;
+}
+.tp-prose .fold-h:hover .fold-toggle,
+.tp-prose .fold-h.is-collapsed .fold-toggle { opacity: 0.7; }
+.tp-prose .fold-h.is-collapsed .fold-h-content::after {
+  content: ' …'; color: theme('colors.slate-warm'); font-weight: 400;
+}
+.tp-prose .folded-hidden { display: none !important; }
 .tp-prose p { line-height: 1.6; margin: 0.25rem 0; }
 /* Bold = brand terracotta (still bold weight) */
 .tp-prose strong { color: theme('colors.terracotta'); font-weight: 700; }

@@ -140,7 +140,7 @@ watch(() => route.params.id, load);
       </div>
     </div>
 
-    <TiptapEditor v-if="draft.layout !== 'board'" v-model="draft.body" min-height="420px" max-height="68vh" />
+    <TiptapEditor v-if="draft.layout !== 'board'" v-model="draft.body" min-height="420px" max-height="68vh" outline />
     <NoteBoard v-else parent-type="note" :parent-id="route.params.id" />
 
     <p class="text-xs text-slate-warm">Created {{ fmtDate(original.created_at) }}</p>
