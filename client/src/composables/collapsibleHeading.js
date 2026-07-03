@@ -74,6 +74,30 @@ function headingNodeView(node, view, getPos) {
 
 export const HeadingFold = Extension.create({
   name: 'headingFold',
+  // Run our Enter handler before StarterKit's split, so we can expand first.
+  priority: 1000,
+
+  addKeyboardShortcuts() {
+    // Editing inside a collapsed heading would otherwise create the new line
+    // *inside the hidden region* — so it looks like Enter does nothing. Expand
+    // the section first, then split as usual.
+    const expandThenSplit = () => {
+      const { state } = this.editor;
+      const { $from } = state.selection;
+      const node = $from.parent;
+      if (node.type.name !== 'heading' || !node.attrs.collapsed) return false;
+      const headingPos = $from.before();
+      return this.editor
+        .chain()
+        .command(({ tr }) => {
+          tr.setNodeMarkup(headingPos, undefined, { ...node.attrs, collapsed: false });
+          return true;
+        })
+        .splitBlock()
+        .run();
+    };
+    return { Enter: expandThenSplit };
+  },
 
   addGlobalAttributes() {
     return [{
