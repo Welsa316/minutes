@@ -78,24 +78,33 @@ export const HeadingFold = Extension.create({
   priority: 1000,
 
   addKeyboardShortcuts() {
-    // Pressing Enter inside a collapsed heading would otherwise create the new
-    // line *inside the hidden region*, so it looks like Enter does nothing (or
-    // only expands). Do it deterministically in one transaction: expand the
-    // section, split at the cursor into a paragraph, and move the cursor into it.
+    // Enter on a COLLAPSED heading starts a new sibling section right after this
+    // one — it does NOT open the folded section. (To add content inside, expand
+    // it with the arrow first.) The new heading is inserted after the folded
+    // section's content, at the same level, with the cursor in it.
     const handleEnter = () => {
       const { state } = this.editor;
       const { $from } = state.selection;
       const node = $from.parent;
       if (node.type.name !== 'heading' || !node.attrs.collapsed) return false;
+
+      const level = node.attrs.level;
       const headingPos = $from.before();
-      const cursor = $from.pos;
-      const paragraph = state.schema.nodes.paragraph;
+      // Insert point = the next heading of equal-or-higher level (the end of this
+      // section), or the end of the document.
+      let insertAt = state.doc.content.size;
+      let done = false;
+      state.doc.forEach((n, offset) => {
+        if (done || offset <= headingPos) return;
+        if (n.type.name === 'heading' && n.attrs.level <= level) { insertAt = offset; done = true; }
+      });
+
+      const headingType = state.schema.nodes.heading;
       return this.editor.commands.command(({ tr, dispatch }) => {
         if (dispatch) {
-          tr.setNodeMarkup(headingPos, undefined, { ...node.attrs, collapsed: false });
-          tr.split(cursor, 1, [{ type: paragraph }]);
-          const landing = tr.mapping.map(cursor);
-          tr.setSelection(TextSelection.near(tr.doc.resolve(landing)));
+          const newHeading = headingType.createAndFill({ level });
+          tr.insert(insertAt, newHeading);
+          tr.setSelection(TextSelection.near(tr.doc.resolve(insertAt + 1)));
           tr.scrollIntoView();
           dispatch(tr);
         }
