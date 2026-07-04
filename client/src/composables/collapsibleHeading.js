@@ -111,7 +111,53 @@ export const HeadingFold = Extension.create({
         return true;
       });
     };
-    return { Enter: handleEnter };
+
+    // Collapsed headings whose fold range contains `pos` (so `pos` is hidden).
+    const hidingAncestors = (doc, pos) => {
+      const hs = [];
+      doc.forEach((n, offset) => { if (n.type.name === 'heading') hs.push({ offset, level: n.attrs.level, node: n }); });
+      const out = [];
+      for (let i = 0; i < hs.length; i++) {
+        const hi = hs[i];
+        if (!hi.node.attrs.collapsed) continue;
+        let end = doc.content.size;
+        for (let j = i + 1; j < hs.length; j++) { if (hs[j].level <= hi.level) { end = hs[j].offset; break; } }
+        if (hi.offset < pos && pos < end) out.push(hi.offset);
+      }
+      return out;
+    };
+
+    // Tab demotes a heading (H1→H2→H3), nesting it under the heading above so it
+    // folds with its parent; Shift-Tab promotes it back. Non-headings fall
+    // through so lists keep their normal Tab behaviour.
+    const changeLevel = (delta) => () => {
+      const { state } = this.editor;
+      const { $from } = state.selection;
+      const node = $from.parent;
+      if (node.type.name !== 'heading') return false;
+      const level = node.attrs.level;
+      const newLevel = delta > 0 ? Math.min(level + 1, 3) : Math.max(level - 1, 1);
+      if (newLevel === level) return true; // already at the bound — swallow Tab
+      const headingPos = $from.before();
+      return this.editor.commands.command(({ tr, dispatch }) => {
+        if (dispatch) {
+          tr.setNodeMarkup(headingPos, undefined, { ...node.attrs, level: newLevel });
+          // If nesting slid it under a collapsed parent, open that parent so it stays visible.
+          for (const p of hidingAncestors(tr.doc, headingPos)) {
+            const pn = tr.doc.nodeAt(p);
+            if (pn) tr.setNodeMarkup(p, undefined, { ...pn.attrs, collapsed: false });
+          }
+          dispatch(tr);
+        }
+        return true;
+      });
+    };
+
+    return {
+      Enter: handleEnter,
+      Tab: changeLevel(1),
+      'Shift-Tab': changeLevel(-1),
+    };
   },
 
   addGlobalAttributes() {
