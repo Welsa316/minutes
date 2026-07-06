@@ -53,6 +53,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function loginWithGoogle(credential) {
+    loading.value = true;
+    error.value = null;
+    try {
+      const { data } = await api.post('/auth/google', { credential });
+      user.value = data;
+      return true;
+    } catch (e) {
+      error.value = e?.response?.data?.error || 'Google sign-in failed';
+      user.value = null;
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function logout() {
     try { await api.post('/auth/logout'); } catch { /* ignore — cookie cleared either way */ }
     user.value = null;
@@ -64,5 +80,5 @@ export const useAuthStore = defineStore('auth', () => {
     } catch { /* private mode / storage disabled */ }
   }
 
-  return { user, checked, loading, error, isAuthenticated, fetchMe, login, register, logout };
+  return { user, checked, loading, error, isAuthenticated, fetchMe, login, register, loginWithGoogle, logout };
 });

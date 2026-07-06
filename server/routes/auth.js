@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 import { query } from '../db/index.js';
 
 const router = Router();
+const googleClient = new OAuth2Client();
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 function cookieOpts() {
@@ -57,6 +59,51 @@ router.post('/login', async (req, res, next) => {
     const ok = await bcrypt.compare(password, hash);
     if (!user || !user.password_hash || !ok) return res.status(401).json({ error: 'Invalid email or password.' });
 
+    res.json(issue(res, user));
+  } catch (e) { next(e); }
+});
+
+// Sign in with Google. The client sends the ID token ("credential") from Google
+// Identity Services; we verify its signature against Google's keys, then link
+// or create a local user. No client secret needed — this is the SPA flow.
+router.post('/google', async (req, res, next) => {
+  try {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) return res.status(501).json({ error: 'Google sign-in is not configured.' });
+
+    const credential = String(req.body?.credential || '');
+    if (!credential) return res.status(400).json({ error: 'Missing Google credential.' });
+
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: clientId });
+      payload = ticket.getPayload();
+    } catch {
+      return res.status(401).json({ error: 'Invalid Google credential.' });
+    }
+    if (!payload?.email || !payload.email_verified) {
+      return res.status(401).json({ error: 'Your Google email is not verified.' });
+    }
+
+    const googleId = payload.sub;
+    const email = payload.email.toLowerCase();
+    const name = payload.name || email.split('@')[0];
+
+    // Prefer matching on google_id; otherwise link Google to an existing
+    // email/password account, or create a fresh Google-only account.
+    let user = (await query('SELECT id, email, name FROM users WHERE google_id = $1', [googleId])).rows[0];
+    if (!user) {
+      const byEmail = (await query('SELECT id, email, name FROM users WHERE email = $1', [email])).rows[0];
+      if (byEmail) {
+        await query('UPDATE users SET google_id = $1 WHERE id = $2', [googleId, byEmail.id]);
+        user = byEmail;
+      } else {
+        user = (await query(
+          'INSERT INTO users (email, name, google_id) VALUES ($1, $2, $3) RETURNING id, email, name',
+          [email, name, googleId],
+        )).rows[0];
+      }
+    }
     res.json(issue(res, user));
   } catch (e) { next(e); }
 });
