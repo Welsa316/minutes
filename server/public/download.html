@@ -10,168 +10,244 @@
   <link rel="icon" href="/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --ink: #0F1B2D;
-      --ink-2: #0b1524;
-      --terracotta: #C65D3E;
-      --terracotta-hi: #d97a5a;
-      --warm: #FBF8F3;
-      --sand: #E8DDD0;
-      --muted: #93a4b8;
-      --line: #24384d;
+      --ink: #0b1322; --ink-2: #070d18; --line: #22344b;
+      --terra: #C65D3E; --terra-hi: #e08a66; --terra-lo: #a2493a;
+      --warm: #FBF8F3; --sand: #E8DDD0; --gold: #e6c9a0;
+      --fg: #f2ede4; --muted: #8ea0b8; --muted-2: #64758d;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; }
     body {
-      min-height: 100vh;
-      background:
-        radial-gradient(1100px 520px at 50% -8%, rgba(198,93,62,0.20), transparent 60%),
-        radial-gradient(800px 400px at 85% 10%, rgba(63,107,76,0.10), transparent 55%),
-        var(--ink);
-      color: var(--warm);
+      min-height: 100vh; overflow-x: hidden; color: var(--fg);
+      background: var(--ink-2);
       font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 3.5rem 1.25rem 2.5rem;
+      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
     }
-    .wrap { width: 100%; max-width: 680px; text-align: center; }
+    /* Ambient depth */
+    .bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+    .bg::before { content: ""; position: absolute; inset: 0;
+      background:
+        radial-gradient(1200px 700px at 72% -6%, rgba(198,93,62,0.22), transparent 60%),
+        radial-gradient(900px 600px at 8% 12%, rgba(63,107,76,0.10), transparent 60%),
+        linear-gradient(180deg, #0d1526 0%, #070d18 70%); }
+    .orb { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .5; }
+    .orb.a { width: 420px; height: 420px; top: -80px; right: -60px; background: radial-gradient(circle, rgba(224,138,102,.5), transparent 70%); }
+    .orb.b { width: 360px; height: 360px; bottom: -120px; left: -80px; background: radial-gradient(circle, rgba(120,90,180,.28), transparent 70%); }
+    .orb.c { width: 260px; height: 260px; top: 40%; left: 44%; background: radial-gradient(circle, rgba(230,201,160,.16), transparent 70%); }
+    .grain { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: .04;
+      background-image: radial-gradient(rgba(255,255,255,.6) .5px, transparent .5px); background-size: 3px 3px; }
 
-    .brand { display: inline-flex; align-items: center; gap: .6rem; margin-bottom: 2.25rem; }
-    .mark {
-      width: 34px; height: 34px; border-radius: 9px; background: var(--terracotta);
-      color: #fff; font-family: "IBM Plex Serif", Georgia, serif; font-weight: 600;
-      display: grid; place-items: center; font-size: 1.15rem;
-      box-shadow: 0 6px 20px rgba(198,93,62,0.35);
-    }
-    .brand span { font-weight: 600; letter-spacing: .01em; font-size: 1.05rem; }
+    .shell { position: relative; z-index: 2; max-width: 1120px; margin: 0 auto; padding: 2rem 1.5rem 3rem; }
 
-    h1 {
-      font-family: "IBM Plex Serif", Georgia, serif; font-weight: 600;
-      font-size: clamp(2.4rem, 7vw, 3.6rem); line-height: 1.05; margin: 0 0 .8rem;
-      letter-spacing: -0.01em;
-    }
-    .tagline { color: #c9d4e0; font-size: clamp(1rem, 2.6vw, 1.2rem); margin: 0 auto 2.2rem; max-width: 30ch; line-height: 1.5; }
+    .top { display: flex; align-items: center; gap: .65rem; }
+    .mark { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+      font-family: "IBM Plex Serif", serif; font-weight: 600; font-size: 1.15rem; color: #fff;
+      background: linear-gradient(150deg, var(--terra-hi), var(--terra-lo));
+      box-shadow: 0 8px 24px rgba(198,93,62,.4), inset 0 1px 0 rgba(255,255,255,.25); }
+    .top b { font-weight: 600; font-size: 1.05rem; letter-spacing: .01em; }
+    .top .badge { margin-left: auto; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--gold); border: 1px solid rgba(230,201,160,.3); border-radius: 999px; padding: .3rem .7rem; }
 
-    .downloads { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; }
-    .btn {
-      display: inline-flex; align-items: center; gap: .6rem;
-      padding: .85rem 1.4rem; border-radius: .7rem; font-size: 1rem; font-weight: 600;
-      text-decoration: none; border: 1px solid transparent; cursor: pointer;
-      transition: transform .12s ease, background .15s ease, border-color .15s ease;
-      white-space: nowrap;
-    }
-    .btn svg { width: 20px; height: 20px; flex: none; }
-    .btn:hover { transform: translateY(-1px); }
-    .btn.primary { background: var(--terracotta); color: #fff; }
-    .btn.primary:hover { background: var(--terracotta-hi); }
-    .btn.ghost { background: rgba(255,255,255,0.04); color: var(--warm); border-color: var(--line); }
-    .btn.ghost:hover { border-color: #3a5570; background: rgba(255,255,255,0.07); }
-    .btn .sub { font-weight: 400; font-size: .78rem; opacity: .7; }
+    .hero { display: grid; grid-template-columns: 1.05fr .95fr; gap: 2.5rem; align-items: center; margin-top: 4.5rem; }
 
-    .meta { color: var(--muted); font-size: .82rem; margin-top: 1.15rem; }
-    .meta a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
-    .meta a:hover { color: var(--warm); }
+    .eyebrow { font-size: .8rem; letter-spacing: .18em; text-transform: uppercase; color: var(--terra-hi);
+      display: inline-flex; align-items: center; gap: .5rem; margin: 0 0 1.1rem; }
+    .eyebrow::before { content: ""; width: 26px; height: 1px; background: linear-gradient(90deg, var(--terra), transparent); }
+    h1 { font-family: "IBM Plex Serif", Georgia, serif; font-weight: 500; letter-spacing: -.015em;
+      font-size: clamp(2.7rem, 5.4vw, 4.3rem); line-height: 1.02; margin: 0 0 1.1rem; }
+    h1 .it { font-style: italic; font-weight: 500; color: var(--gold); }
+    .lede { color: #c6d2e2; font-size: clamp(1.02rem, 1.6vw, 1.2rem); line-height: 1.6; margin: 0 0 2.1rem; max-width: 34ch; }
 
-    .features {
-      margin-top: 2.6rem; display: flex; gap: .5rem .9rem; flex-wrap: wrap; justify-content: center;
-      color: var(--muted); font-size: .85rem;
-    }
-    .features span { display: inline-flex; align-items: center; gap: .4rem; }
-    .features .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--terracotta); opacity: .8; }
+    .cta { display: flex; gap: .8rem; flex-wrap: wrap; }
+    .btn { position: relative; display: inline-flex; align-items: center; gap: .65rem; text-decoration: none;
+      padding: .95rem 1.5rem; border-radius: .85rem; font-size: 1rem; font-weight: 600; cursor: pointer;
+      border: 1px solid transparent; transition: transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .25s ease, border-color .2s; will-change: transform; }
+    .btn svg { width: 20px; height: 20px; }
+    .btn .sub { font-weight: 400; font-size: .76rem; opacity: .72; }
+    .btn.primary { color: #fff; background: linear-gradient(150deg, var(--terra-hi), var(--terra-lo));
+      box-shadow: 0 10px 30px rgba(198,93,62,.35), inset 0 1px 0 rgba(255,255,255,.22); }
+    .btn.primary:hover { transform: translateY(-3px); box-shadow: 0 18px 42px rgba(198,93,62,.5), inset 0 1px 0 rgba(255,255,255,.28); }
+    .btn.ghost { color: var(--fg); background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.12); backdrop-filter: blur(8px); }
+    .btn.ghost:hover { transform: translateY(-3px); border-color: rgba(255,255,255,.25); background: rgba(255,255,255,.08); }
 
-    details {
-      margin-top: 2.4rem; text-align: left; border: 1px solid var(--line); border-radius: .7rem;
-      background: rgba(255,255,255,0.02); overflow: hidden;
-    }
-    summary {
-      cursor: pointer; padding: .85rem 1.1rem; font-size: .9rem; color: #c9d4e0; list-style: none;
-      display: flex; align-items: center; justify-content: space-between;
-    }
+    .meta { color: var(--muted); font-size: .84rem; margin-top: 1.3rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+    .meta a { color: var(--muted); text-decoration: none; border-bottom: 1px solid rgba(142,160,184,.35); padding-bottom: 1px; }
+    .meta a:hover { color: var(--fg); }
+    .dotsep { width: 3px; height: 3px; border-radius: 50%; background: var(--muted-2); }
+
+    .chips { display: flex; gap: .5rem .95rem; flex-wrap: wrap; color: var(--muted); font-size: .85rem; margin-top: 2rem; }
+    .chips span { display: inline-flex; align-items: center; gap: .42rem; }
+    .chips i { width: 5px; height: 5px; border-radius: 50%; background: var(--terra); }
+
+    /* 3D stage */
+    .stage { perspective: 1500px; display: flex; justify-content: center; }
+    .float { transform-style: preserve-3d; will-change: transform; }
+    .win-wrap { position: relative; transform-style: preserve-3d; }
+    .win-glow { position: absolute; inset: -14% -10% -22%; border-radius: 32px; z-index: -1;
+      background: radial-gradient(60% 60% at 60% 30%, rgba(224,138,102,.45), transparent 70%);
+      filter: blur(50px); transform: translateZ(-120px); }
+    .window { width: 460px; max-width: 78vw; border-radius: 18px; overflow: hidden;
+      background: linear-gradient(180deg, #fffdf9, #f6efe6); color: #0F1B2D; transform-style: preserve-3d;
+      border: 1px solid rgba(255,255,255,.6);
+      box-shadow: 0 40px 90px rgba(2,8,20,.6), 0 8px 24px rgba(2,8,20,.4), inset 0 1px 0 rgba(255,255,255,.9); }
+    .titlebar { display: flex; align-items: center; gap: .5rem; padding: .7rem .9rem; border-bottom: 1px solid #ece3d6; background: #fbf6ee; }
+    .tl { width: 11px; height: 11px; border-radius: 50%; }
+    .tl.r { background: #ec6a5e; } .tl.y { background: #f4bf4f; } .tl.g { background: #61c554; }
+    .titlebar b { margin-left: .5rem; font-family: "IBM Plex Serif", serif; font-weight: 600; font-size: .82rem; color: #3a2f27; }
+    .wbody { display: grid; grid-template-columns: 108px 1fr; min-height: 300px; }
+    .wside { border-right: 1px solid #efe6d9; padding: .8rem .6rem; background: #faf5ed; }
+    .wside .navi { font-size: .74rem; color: #6b5b4d; padding: .4rem .5rem; border-radius: 7px; margin-bottom: .12rem; }
+    .wside .navi.on { background: #efe4d4; color: #23180f; font-weight: 600; }
+    .wmain { padding: 1rem 1.1rem; }
+    .wgreet { font-family: "IBM Plex Serif", serif; font-size: 1.05rem; color: #1b2740; margin-bottom: .85rem; }
+    .wcard { border: 1px solid #ece3d5; border-radius: 12px; padding: .7rem .8rem; margin-bottom: .7rem; background: #fffdf9; }
+    .wcard h4 { font-family: "IBM Plex Serif", serif; font-weight: 600; font-size: .82rem; margin: 0 0 .55rem; color: #26313f; }
+    .wrow { display: flex; align-items: center; gap: .5rem; margin: .38rem 0; }
+    .wrow .d { width: 6px; height: 6px; border-radius: 50%; background: var(--terra); flex: none; }
+    .wrow .t { font-size: .74rem; color: #33404f; }
+    .wrow .t small { color: #97897a; }
+    .heat { display: flex; gap: 3px; margin-top: .2rem; }
+    .heat i { width: 9px; height: 9px; border-radius: 2px; background: #ece3d5; }
+    .heat i.l1 { background: #f0c4b2; } .heat i.l2 { background: #d98a6e; } .heat i.l3 { background: var(--terra); }
+
+    .flchip { position: absolute; border-radius: 12px; padding: .55rem .75rem; font-size: .76rem; font-weight: 500;
+      background: rgba(16,26,44,.72); color: #fff; border: 1px solid rgba(255,255,255,.14); backdrop-filter: blur(10px);
+      box-shadow: 0 16px 40px rgba(2,8,20,.5); display: flex; align-items: center; gap: .45rem; white-space: nowrap; }
+    .flchip .ic { width: 18px; height: 18px; border-radius: 6px; display: grid; place-items: center; font-size: .7rem; }
+    .flchip.done { top: 8%; left: -14%; transform: translateZ(70px); }
+    .flchip.done .ic { background: #3F6B4C; }
+    .flchip.new { bottom: 6%; right: -12%; transform: translateZ(95px); }
+    .flchip.new .ic { background: var(--terra); }
+
+    details { margin-top: 3.2rem; max-width: 620px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255,255,255,.025); overflow: hidden; backdrop-filter: blur(6px); }
+    summary { cursor: pointer; padding: .95rem 1.2rem; font-size: .92rem; color: #d3dcea; list-style: none; display: flex; align-items: center; justify-content: space-between; }
     summary::-webkit-details-marker { display: none; }
-    summary::after { content: "+"; color: var(--muted); font-size: 1.1rem; }
-    details[open] summary::after { content: "–"; }
-    .howto-body { padding: 0 1.1rem 1.1rem; color: var(--muted); font-size: .86rem; line-height: 1.6; }
-    .howto-body strong { color: #c9d4e0; font-weight: 600; }
-    .howto-body code {
-      background: var(--ink-2); border: 1px solid var(--line); border-radius: 5px;
-      padding: .1rem .4rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82em; color: var(--sand);
-    }
-    .howto-body p { margin: .5rem 0; }
+    summary::after { content: "+"; color: var(--muted); font-size: 1.2rem; }
+    details[open] summary::after { content: "\2013"; }
+    .hb { padding: 0 1.2rem 1.2rem; color: var(--muted); font-size: .87rem; line-height: 1.65; }
+    .hb strong { color: #d3dcea; font-weight: 600; }
+    .hb code { background: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: .1rem .45rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82em; color: var(--sand); }
+    .hb p { margin: .55rem 0; }
 
-    footer { margin-top: 3rem; color: #5f7286; font-size: .78rem; }
+    footer { margin-top: 3.5rem; color: var(--muted-2); font-size: .78rem; }
     footer a { color: #7d90a5; text-decoration: none; }
-    footer a:hover { color: var(--warm); }
+    footer a:hover { color: var(--fg); }
+
+    @media (max-width: 880px) {
+      .hero { grid-template-columns: 1fr; gap: 3rem; margin-top: 3rem; text-align: center; }
+      .eyebrow, .lede { margin-left: auto; margin-right: auto; }
+      .cta, .chips, .meta { justify-content: center; }
+      .stage { order: 2; }
+      .flchip.done { left: -6%; } .flchip.new { right: -4%; }
+      details { margin-left: auto; margin-right: auto; text-align: left; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="brand"><span class="mark">M</span><span>Minutes</span></div>
+  <div class="bg"><div class="orb a" data-orb></div><div class="orb b" data-orb></div><div class="orb c" data-orb></div></div>
+  <div class="grain"></div>
 
-    <h1>Minutes on your desktop</h1>
-    <p class="tagline">Meeting notes and a personal CRM, in a native app.</p>
-
-    <div class="downloads" id="downloads">
-      <a class="btn primary" id="btn-mac" href="#" data-os="mac">
-        <svg viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
-        <span>Download for Mac<span class="sub"> · Apple Silicon</span></span>
-      </a>
-      <a class="btn ghost" id="btn-win" href="#" data-os="win">
-        <svg viewBox="0 0 448 512" fill="currentColor" aria-hidden="true"><path d="M0 93.7l183.6-25.3v177.4H0V93.7zm0 324.6l183.6 25.3V268.4H0v149.9zm203.8 28L448 480V268.4H203.8v177.9zm0-380.6v180.1H448V32L203.8 65.7z"/></svg>
-        <span>Download for Windows</span>
-      </a>
+  <div class="shell">
+    <div class="top" data-rise>
+      <span class="mark">M</span><b>Minutes</b>
+      <span class="badge">Desktop</span>
     </div>
 
-    <p class="meta"><span id="version">v0.1.1</span> · <a href="/">Prefer the browser? Open the web app →</a></p>
+    <section class="hero">
+      <div class="col-text">
+        <p class="eyebrow" data-rise>Native app · Mac &amp; Windows</p>
+        <h1 data-rise>Your meetings,<br><span class="it">beautifully</span> in hand.</h1>
+        <p class="lede" data-rise>Meeting notes and a personal CRM, distilled into a fast, focused desktop app.</p>
 
-    <div class="features">
-      <span><i class="dot"></i>Meetings</span>
-      <span><i class="dot"></i>Clients</span>
-      <span><i class="dot"></i>Notes</span>
-      <span><i class="dot"></i>Boards</span>
-      <span><i class="dot"></i>To-dos</span>
-    </div>
+        <div class="cta" data-rise id="cta">
+          <a class="btn primary" id="btn-mac" href="#" data-os="mac">
+            <svg viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+            <span>Download for Mac<span class="sub"> · Apple Silicon</span></span>
+          </a>
+          <a class="btn ghost" id="btn-win" href="#" data-os="win">
+            <svg viewBox="0 0 448 512" fill="currentColor" aria-hidden="true"><path d="M0 93.7l183.6-25.3v177.4H0V93.7zm0 324.6l183.6 25.3V268.4H0v149.9zm203.8 28L448 480V268.4H203.8v177.9zm0-380.6v180.1H448V32L203.8 65.7z"/></svg>
+            <span>Download for Windows</span>
+          </a>
+        </div>
 
-    <details>
+        <p class="meta" data-rise>
+          <span id="version">v0.1.1</span><i class="dotsep"></i>
+          <a href="/">Prefer the browser? Open the web app →</a>
+        </p>
+
+        <div class="chips" data-rise>
+          <span><i></i>Meetings</span><span><i></i>Clients</span><span><i></i>Notes</span><span><i></i>Boards</span><span><i></i>To-dos</span>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="float" id="float">
+          <div class="win-wrap" id="win">
+            <div class="win-glow"></div>
+            <div class="window">
+              <div class="titlebar"><span class="tl r"></span><span class="tl y"></span><span class="tl g"></span><b>Minutes</b></div>
+              <div class="wbody">
+                <div class="wside">
+                  <div class="navi on">Dashboard</div>
+                  <div class="navi">Meetings</div>
+                  <div class="navi">Clients</div>
+                  <div class="navi">Notes</div>
+                  <div class="navi">Boards</div>
+                </div>
+                <div class="wmain">
+                  <div class="wgreet">Good morning, Walid</div>
+                  <div class="wcard">
+                    <h4>Upcoming meetings</h4>
+                    <div class="wrow"><span class="d"></span><span class="t">Kickoff call <small>· Tue 2:00</small></span></div>
+                    <div class="wrow"><span class="d"></span><span class="t">Design review <small>· Wed 10:00</small></span></div>
+                  </div>
+                  <div class="wcard">
+                    <h4>Activity</h4>
+                    <div class="heat"><i></i><i class="l1"></i><i class="l2"></i><i></i><i class="l3"></i><i class="l1"></i><i></i><i class="l2"></i><i class="l3"></i><i class="l1"></i><i></i><i></i></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="flchip done"><span class="ic">✓</span>Task done</div>
+            <div class="flchip new"><span class="ic">+</span>New meeting</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <details data-rise>
       <summary>First time opening it?</summary>
-      <div class="howto-body">
-        <p>These builds aren't signed with a paid developer certificate, so your OS shows a one-time warning. Nothing is wrong with the app.</p>
-        <p><strong>macOS</strong> — right-click the app → <strong>Open</strong> → <strong>Open</strong>. If it says "damaged", run this once in Terminal, then open normally:<br>
-        <code>xattr -cr /Applications/Minutes.app</code></p>
+      <div class="hb">
+        <p>These builds aren't signed with a paid developer certificate, so your OS shows a one-time prompt. Nothing is wrong with the app.</p>
+        <p><strong>macOS</strong> — right-click the app → <strong>Open</strong> → <strong>Open</strong>. If it says "damaged", run this once in Terminal, then open normally:<br><code>xattr -cr /Applications/Minutes.app</code></p>
         <p><strong>Windows</strong> — on the SmartScreen prompt, click <strong>More info</strong> → <strong>Run anyway</strong>.</p>
       </div>
     </details>
 
-    <footer>Personal build · <a href="https://github.com/Welsa316/minutes/releases" target="_blank" rel="noopener">All releases</a></footer>
+    <footer data-rise>Personal build · <a href="https://github.com/Welsa316/minutes/releases" target="_blank" rel="noopener">All releases</a></footer>
   </div>
 
+  <script src="/download-assets/anime.min.js"></script>
   <script>
     (function () {
       var REPO = 'Welsa316/minutes';
-      // Fallbacks in case the GitHub API is unreachable/rate-limited.
       var links = {
         mac: 'https://github.com/Welsa316/minutes/releases/download/v0.1.1/Minutes-0.1.1-arm64.dmg',
         win: 'https://github.com/Welsa316/minutes/releases/download/v0.1.1/Minutes.Setup.0.1.1.exe'
       };
       var macBtn = document.getElementById('btn-mac');
       var winBtn = document.getElementById('btn-win');
-      macBtn.href = links.mac;
-      winBtn.href = links.win;
+      macBtn.href = links.mac; winBtn.href = links.win;
 
-      // Highlight the visitor's platform: make it the primary button and put it first.
-      var ua = navigator.userAgent || '';
-      var isWin = /Windows/i.test(ua);
-      if (isWin) {
+      if (/Windows/i.test(navigator.userAgent || '')) {
         winBtn.classList.remove('ghost'); winBtn.classList.add('primary');
         macBtn.classList.remove('primary'); macBtn.classList.add('ghost');
-        var dl = document.getElementById('downloads');
-        dl.insertBefore(winBtn, macBtn);
+        document.getElementById('cta').insertBefore(winBtn, macBtn);
       }
 
-      // Pull the latest release so links + version stay current automatically.
       fetch('https://api.github.com/repos/' + REPO + '/releases/latest')
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (rel) {
@@ -181,8 +257,54 @@
           if (dmg) macBtn.href = dmg.browser_download_url;
           if (exe) winBtn.href = exe.browser_download_url;
           if (rel.tag_name) document.getElementById('version').textContent = rel.tag_name;
-        })
-        .catch(function () {});
+        }).catch(function () {});
+
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce || typeof anime === 'undefined') return;
+
+      var rises = document.querySelectorAll('[data-rise]');
+      var introDone = false;
+
+      // The staggered reveal is the ONLY thing that hides content — and it only
+      // runs when the page is visible (rAF pauses on hidden tabs, which would
+      // otherwise leave content stuck invisible). Default state stays visible.
+      function playIntro() {
+        if (introDone) return; introDone = true;
+        anime.set(rises, { opacity: 0, translateY: 26 });
+        anime.set('#float', { opacity: 0, translateY: 40, rotateY: -16, scale: .94 });
+        anime.set('.flchip', { opacity: 0 });
+        anime.timeline({ easing: 'cubicBezier(.22,1,.36,1)', duration: 900 })
+          .add({ targets: rises, opacity: [0, 1], translateY: [26, 0], delay: anime.stagger(90), duration: 800 }, 200)
+          .add({ targets: '#float', opacity: [0, 1], translateY: [40, 0], rotateY: [-16, 0], scale: [.94, 1], duration: 1400, easing: 'cubicBezier(.16,1,.3,1)' }, 350)
+          .add({ targets: '.flchip.done', opacity: [0, 1], translateX: [-24, 0], scale: [.8, 1], duration: 700 }, '-=650')
+          .add({ targets: '.flchip.new', opacity: [0, 1], translateX: [24, 0], scale: [.8, 1], duration: 700 }, '-=550');
+      }
+
+      // Ambient loops + cursor tilt never hide anything, so they can always run.
+      anime({ targets: '.window', translateY: [-8, 8], direction: 'alternate', loop: true, duration: 4200, easing: 'easeInOutSine' });
+      anime({ targets: '.orb.a', translateX: [-18, 22], translateY: [-14, 16], direction: 'alternate', loop: true, duration: 9000, easing: 'easeInOutSine' });
+      anime({ targets: '.orb.b', translateX: [16, -20], translateY: [12, -18], direction: 'alternate', loop: true, duration: 11000, easing: 'easeInOutSine' });
+      anime({ targets: '.flchip.done', translateY: [-6, 6], direction: 'alternate', loop: true, duration: 3600, easing: 'easeInOutSine', delay: 400 });
+      anime({ targets: '.flchip.new', translateY: [7, -7], direction: 'alternate', loop: true, duration: 4000, easing: 'easeInOutSine' });
+
+      var win = document.getElementById('win');
+      var stage = document.querySelector('.stage');
+      var tx = 0, ty = 0, cx = 0, cy = 0;
+      window.addEventListener('mousemove', function (e) {
+        var r = stage.getBoundingClientRect();
+        tx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / r.width));
+        ty = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / r.height));
+      });
+      (function loop() {
+        cx += (tx - cx) * 0.06; cy += (ty - cy) * 0.06;
+        win.style.transform = 'rotateY(' + (cx * 13) + 'deg) rotateX(' + (-cy * 11) + 'deg)';
+        requestAnimationFrame(loop);
+      })();
+
+      if (document.visibilityState === 'visible') playIntro();
+      else document.addEventListener('visibilitychange', function h() {
+        if (document.visibilityState === 'visible') { document.removeEventListener('visibilitychange', h); playIntro(); }
+      });
     })();
   </script>
 </body>

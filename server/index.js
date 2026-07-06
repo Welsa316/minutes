@@ -75,6 +75,7 @@ app.use('/api/boards',       requireAuth, workspaceScope, boardsRoutes);
 
 // Public desktop-app download page (no auth) — registered before the SPA
 // fallback so /download serves the landing page, not the app shell.
+app.use('/download-assets', express.static(path.join(__dirname, 'public')));
 app.get('/download', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'download.html'));
 });
