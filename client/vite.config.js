@@ -3,6 +3,9 @@ import vue from '@vitejs/plugin-vue';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // Load env from the repo root so the single root .env feeds both server and
+  // client (only VITE_-prefixed vars are ever exposed to the client bundle).
+  envDir: '..',
   plugins: [
     vue(),
     VitePWA({
