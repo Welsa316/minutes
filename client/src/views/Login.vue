@@ -15,6 +15,10 @@ const password = ref('');
 const name = ref('');
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+// Google's OAuth popup doesn't work reliably inside the Electron desktop shell,
+// so only offer it in a real browser. Desktop users sign in with a password.
+const isElectron = typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent);
+const showGoogle = GOOGLE_CLIENT_ID && !isElectron;
 let tokenClient = null;
 
 function toggleMode() {
@@ -63,7 +67,7 @@ async function onGoogleToken(resp) {
 }
 
 onMounted(async () => {
-  if (!GOOGLE_CLIENT_ID) return;
+  if (!showGoogle) return;
   try {
     await loadGoogleScript();
     // Token (implicit) flow so we can drive Google from our own button.
@@ -85,7 +89,7 @@ function signInWithGoogle() {
   <div class="min-h-dvh flex items-center justify-center bg-warm px-4">
     <div class="w-full max-w-sm">
       <div class="text-center mb-8">
-        <div class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-ink text-warm font-serif text-3xl mb-4">m</div>
+        <div class="inline-flex h-14 w-14 items-center justify-center rounded-xl font-serif text-3xl mb-4" style="background-color:#C65D3E;color:#FBF8F3">m</div>
         <h1 class="text-3xl font-serif text-ink">Minutes</h1>
       </div>
 
@@ -96,8 +100,15 @@ function signInWithGoogle() {
         </div>
 
         <div>
-          <label class="label" for="email">Email</label>
-          <input id="email" v-model="email" type="email" autocomplete="email" required class="input" />
+          <label class="label" for="email">{{ isSignup ? 'Email' : 'Email or username' }}</label>
+          <input
+            id="email"
+            v-model="email"
+            :type="isSignup ? 'email' : 'text'"
+            :autocomplete="isSignup ? 'email' : 'username'"
+            required
+            class="input"
+          />
         </div>
 
         <div>
@@ -121,7 +132,7 @@ function signInWithGoogle() {
           <template v-else>{{ auth.loading ? 'Signing in…' : 'Sign in' }}</template>
         </button>
 
-        <template v-if="GOOGLE_CLIENT_ID">
+        <template v-if="showGoogle">
           <div class="flex items-center gap-3 text-xs text-slate-warm">
             <span class="h-px flex-1 bg-sand" />
             or
