@@ -15,7 +15,7 @@ const password = ref('');
 const name = ref('');
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const googleBtn = ref(null);
+let tokenClient = null;
 
 function toggleMode() {
   mode.value = isSignup.value ? 'signin' : 'signup';
@@ -51,8 +51,14 @@ function loadGoogleScript() {
   });
 }
 
-async function handleGoogle(response) {
-  const ok = await auth.loginWithGoogle(response.credential);
+async function onGoogleToken(resp) {
+  if (!resp?.access_token) {
+    if (resp?.error && resp.error !== 'popup_closed' && resp.error !== 'access_denied') {
+      auth.error = 'Google sign-in failed.';
+    }
+    return;
+  }
+  const ok = await auth.loginWithGoogle({ access_token: resp.access_token });
   if (ok) goAfterAuth();
 }
 
@@ -60,12 +66,19 @@ onMounted(async () => {
   if (!GOOGLE_CLIENT_ID) return;
   try {
     await loadGoogleScript();
-    window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogle });
-    window.google.accounts.id.renderButton(googleBtn.value, {
-      theme: 'outline', size: 'large', width: 320, text: 'continue_with', shape: 'rectangular',
+    // Token (implicit) flow so we can drive Google from our own button.
+    tokenClient = window.google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'openid email profile',
+      callback: onGoogleToken,
     });
   } catch { /* offline or blocked — email/password still works */ }
 });
+
+function signInWithGoogle() {
+  auth.error = null;
+  tokenClient?.requestAccessToken();
+}
 </script>
 
 <template>
@@ -114,7 +127,13 @@ onMounted(async () => {
             or
             <span class="h-px flex-1 bg-sand" />
           </div>
-          <div ref="googleBtn" class="flex justify-center" />
+          <button type="button" class="g-btn" :disabled="auth.loading" @click="signInWithGoogle">
+            <svg class="g-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21.6 12A9.6 9.6 0 1 0 18 19.4" />
+              <path d="M21.6 12H13" />
+            </svg>
+            <span>Continue with Google</span>
+          </button>
         </template>
       </form>
 
@@ -131,3 +150,34 @@ onMounted(async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* On-theme "Continue with Google": a floating pill in Minutes colours with a
+   single-tone outlined G. Adapts to warm dark mode via the shared CSS vars. */
+.g-btn {
+  display: flex; align-items: center; justify-content: center; gap: 0.65rem;
+  width: 100%; height: 48px; padding: 0 1rem;
+  border-radius: 9999px;
+  background: rgb(var(--c-surface));
+  border: 1px solid rgb(var(--c-sand));
+  color: rgb(var(--c-ink));
+  font-family: inherit; font-size: 0.95rem; font-weight: 500; cursor: pointer;
+  box-shadow: 0 10px 22px -12px rgba(15, 27, 45, 0.30);
+  transition: transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s ease,
+              border-color .28s ease, background .2s ease;
+}
+.g-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 32px -14px rgba(15, 27, 45, 0.42);
+  border-color: rgb(var(--c-terracotta));
+}
+.g-btn:active { transform: translateY(0); box-shadow: 0 8px 18px -12px rgba(15, 27, 45, 0.34); }
+.g-btn:focus-visible { outline: 2px solid rgb(var(--c-terracotta) / 0.6); outline-offset: 2px; }
+.g-btn:disabled { opacity: 0.6; cursor: default; transform: none; }
+.g-mark { width: 20px; height: 20px; color: rgb(var(--c-terracotta)); flex-shrink: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .g-btn { transition: none; }
+  .g-btn:hover, .g-btn:active { transform: none; }
+}
+</style>

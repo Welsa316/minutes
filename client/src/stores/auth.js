@@ -53,11 +53,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function loginWithGoogle(credential) {
+  // payload is { access_token } (custom-button flow) or { credential } (GSI widget).
+  async function loginWithGoogle(payload) {
     loading.value = true;
     error.value = null;
     try {
-      const { data } = await api.post('/auth/google', { credential });
+      const { data } = await api.post('/auth/google', payload);
       user.value = data;
       return true;
     } catch (e) {

@@ -71,23 +71,43 @@ router.post('/google', async (req, res, next) => {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     if (!clientId) return res.status(501).json({ error: 'Google sign-in is not configured.' });
 
-    const credential = String(req.body?.credential || '');
-    if (!credential) return res.status(400).json({ error: 'Missing Google credential.' });
+    const accessToken = req.body?.access_token ? String(req.body.access_token) : '';
+    const credential = req.body?.credential ? String(req.body.credential) : '';
 
-    let payload;
+    let email, googleId, name, emailVerified;
     try {
-      const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: clientId });
-      payload = ticket.getPayload();
+      if (accessToken) {
+        // Custom-button (implicit) flow: confirm the token was minted for THIS
+        // client id — that's what stops an access token issued to another app
+        // from being replayed here — then read the profile from userinfo.
+        const info = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`)
+          .then((r) => (r.ok ? r.json() : null));
+        if (!info || info.aud !== clientId) return res.status(401).json({ error: 'Invalid Google token.' });
+        const profile = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }).then((r) => (r.ok ? r.json() : null));
+        if (!profile?.email) return res.status(401).json({ error: 'Could not read your Google profile.' });
+        email = String(profile.email).toLowerCase();
+        googleId = profile.sub;
+        name = profile.name;
+        emailVerified = profile.email_verified ?? (info.email_verified === 'true');
+      } else if (credential) {
+        // ID-token (GSI widget) flow — kept for compatibility.
+        const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: clientId });
+        const p = ticket.getPayload();
+        email = String(p.email).toLowerCase();
+        googleId = p.sub;
+        name = p.name;
+        emailVerified = p.email_verified;
+      } else {
+        return res.status(400).json({ error: 'Missing Google credential.' });
+      }
     } catch {
       return res.status(401).json({ error: 'Invalid Google credential.' });
     }
-    if (!payload?.email || !payload.email_verified) {
-      return res.status(401).json({ error: 'Your Google email is not verified.' });
-    }
 
-    const googleId = payload.sub;
-    const email = payload.email.toLowerCase();
-    const name = payload.name || email.split('@')[0];
+    if (!email || !emailVerified) return res.status(401).json({ error: 'Your Google email is not verified.' });
+    name = name || email.split('@')[0];
 
     // Prefer matching on google_id; otherwise link Google to an existing
     // email/password account, or create a fresh Google-only account.
