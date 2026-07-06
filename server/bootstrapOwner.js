@@ -6,7 +6,9 @@ import { query } from './db/index.js';
 // so nothing is orphaned and the owner keeps logging in with the same creds.
 // Idempotent — safe to run on every boot.
 export async function bootstrapOwner() {
-  const adminUser = process.env.ADMIN_USERNAME;
+  // Store lowercased: register() and login() both normalize email to lowercase,
+  // so the owner's row must match or they'd be locked out after the migration.
+  const adminUser = process.env.ADMIN_USERNAME?.trim().toLowerCase();
   const adminHash = process.env.ADMIN_PASSWORD_HASH;
   if (!adminUser || !adminHash) return; // fresh install with no legacy owner
 
