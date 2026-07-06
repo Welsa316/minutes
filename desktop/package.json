@@ -1,6 +1,6 @@
 {
   "name": "minutes-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Minutes desktop app — native window for the Minutes web app",
   "author": "WalidAlHakim",
   "private": true,
@@ -23,6 +23,7 @@
     "appId": "com.walidalhakim.minutes",
     "productName": "Minutes",
     "publish": null,
+    "afterPack": "build/afterPack.js",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -34,7 +35,9 @@
       "url-prompt.html"
     ],
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",
       "identity": null
@@ -43,7 +46,9 @@
       "title": "Minutes ${version}"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.png"
     },
     "nsis": {
