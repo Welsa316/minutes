@@ -1,10 +1,12 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useWorkspaceStore } from '../stores/workspace.js';
+import WorkspaceCreate from './WorkspaceCreate.vue';
 
 const ws = useWorkspaceStore();
 const open = ref(false);
 const wrapper = ref(null);
+const showCreate = ref(false);
 
 const accent = computed(() => ws.active?.color ? `#${ws.active.color}` : '#0F1B2D');
 const initial = computed(() => ws.active?.icon || ws.active?.name?.[0] || '?');
@@ -12,27 +14,13 @@ const initial = computed(() => ws.active?.icon || ws.active?.name?.[0] || '?');
 function toggle() { open.value = !open.value; }
 function pick(id) { ws.setActive(id); open.value = false; }
 
-const newName = ref('');
-const creating = ref(false);
-const adding = ref(false);
-async function createWorkspace() {
-  const name = newName.value.trim();
-  if (!name) return;
-  creating.value = true;
-  try {
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    await ws.create({ name, slug, icon: name[0].toUpperCase(), sections: ['notes', 'todos'] });
-    newName.value = '';
-    adding.value = false;
-    open.value = false;
-  } finally { creating.value = false; }
+function openCreate() {
+  open.value = false;
+  showCreate.value = true;
 }
 
 function onDocClick(e) {
-  if (wrapper.value && !wrapper.value.contains(e.target)) {
-    open.value = false;
-    adding.value = false;
-  }
+  if (wrapper.value && !wrapper.value.contains(e.target)) open.value = false;
 }
 onMounted(() => document.addEventListener('mousedown', onDocClick));
 onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
@@ -77,22 +65,13 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 
       <div class="border-t border-sand mt-1 pt-1">
         <button
-          v-if="!adding"
           type="button"
-          @click="adding = true"
+          @click="openCreate"
           class="w-full px-3 py-2 text-left text-xs text-slate-warm hover:text-ink hover:bg-sand/50"
         >+ New workspace</button>
-        <form v-else @submit.prevent="createWorkspace" class="px-2 py-1 flex items-center gap-1">
-          <input
-            v-model="newName"
-            autofocus
-            placeholder="Workspace name"
-            @keydown.escape="adding = false; newName = ''"
-            class="flex-1 bg-transparent text-sm focus:outline-none px-2 py-1 border border-sand rounded"
-          />
-          <button type="submit" :disabled="!newName.trim() || creating" class="text-xs text-terracotta disabled:opacity-50 px-1">Add</button>
-        </form>
       </div>
     </div>
+
+    <WorkspaceCreate v-if="showCreate" @close="showCreate = false" />
   </div>
 </template>

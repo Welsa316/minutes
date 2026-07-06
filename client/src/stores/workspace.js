@@ -83,11 +83,11 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 });
 
 // The module types a workspace can switch on. Todos + Dashboard are global and
-// not listed here. Order is the order they appear in the nav.
+// not listed here. Order is the order they appear in the nav and the picker.
 export const MODULES = [
-  { key: 'clients', label: 'Clients' },
-  { key: 'projects', label: 'Projects' },
-  { key: 'meetings', label: 'Meetings' },
-  { key: 'notes', label: 'Notes' },
-  { key: 'tags', label: 'Tags' },
+  { key: 'notes',    label: 'Notes',    icon: '✎', desc: 'Rich notes, boards, and snippets.' },
+  { key: 'meetings', label: 'Meetings', icon: '◷', desc: 'Prep, live notes, and action items.' },
+  { key: 'clients',  label: 'Clients',  icon: '◉', desc: 'People and companies you work with.' },
+  { key: 'projects', label: 'Projects', icon: '▤', desc: 'Track work with status and deadlines.' },
+  { key: 'tags',     label: 'Tags',     icon: '#', desc: 'Cross-link everything with #tags.' },
 ];
