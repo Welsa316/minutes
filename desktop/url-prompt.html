@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Minutes — Connect</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: #0F1B2D; color: #FBF8F3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    }
+    .card { width: 440px; max-width: 88vw; text-align: center; padding: 2rem; }
+    .mark {
+      width: 46px; height: 46px; margin: 0 auto 1.25rem; border-radius: 12px;
+      background: #C65D3E; color: #fff; display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; font-weight: 700;
+    }
+    h1 { font-size: 1.4rem; margin: 0 0 .35rem; }
+    p { color: #9fb0c3; font-size: .9rem; line-height: 1.55; margin: 0 0 1.4rem; }
+    input {
+      width: 100%; padding: .72rem .9rem; border-radius: .55rem;
+      border: 1px solid #2c3e52; background: #0b1524; color: #FBF8F3; font-size: .95rem;
+    }
+    input:focus { outline: none; border-color: #C65D3E; }
+    button {
+      margin-top: 1rem; width: 100%; padding: .72rem; border: 0; border-radius: .55rem;
+      background: #C65D3E; color: #fff; font-size: .95rem; font-weight: 600; cursor: pointer;
+    }
+    button:hover { background: #b4502f; }
+    .hint { margin-top: 1.1rem; font-size: .78rem; color: #6f8298; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="mark">M</div>
+    <h1>Connect Minutes</h1>
+    <p>Enter the web address of your Minutes server — the URL you deployed on Railway.</p>
+    <input id="url" type="url" placeholder="https://your-app.up.railway.app" autofocus />
+    <button id="save">Connect</button>
+    <div class="hint">You can change this anytime from the File → Set Server URL… menu.</div>
+  </div>
+  <script>
+    (async () => {
+      const input = document.getElementById('url');
+      try { const cur = await window.minutes.getUrl(); if (cur) input.value = cur; } catch {}
+      const save = () => {
+        const v = input.value.trim();
+        if (/^https?:\/\//i.test(v)) window.minutes.setUrl(v);
+        else { input.style.borderColor = '#C65D3E'; input.focus(); }
+      };
+      document.getElementById('save').addEventListener('click', save);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+    })();
+  </script>
+</body>
+</html>
