@@ -22,7 +22,7 @@ const loading = ref(true);
 
 const greeting = computed(() => {
   const h = new Date().getHours();
-  const name = auth.user?.username || '';
+  const name = (auth.user?.name || auth.user?.email?.split('@')[0] || '').split(' ')[0];
   if (h < 5)  return `Late night, ${name}`;
   if (h < 12) return `Good morning, ${name}`;
   if (h < 17) return `Good afternoon, ${name}`;

@@ -2,8 +2,15 @@
 import { ref, reactive, computed, nextTick, onMounted } from 'vue';
 import { useWorkspaceStore, MODULES } from '../stores/workspace.js';
 
+// firstRun = the blocking onboarding gate for a brand-new account: no Cancel,
+// no click-away close — the user must create a workspace to enter the app.
+const props = defineProps({ firstRun: { type: Boolean, default: false } });
 const emit = defineEmits(['close']);
 const ws = useWorkspaceStore();
+
+function requestClose() {
+  if (!props.firstRun) emit('close');
+}
 
 const name = ref('');
 const nameInput = ref(null);
@@ -36,11 +43,12 @@ onMounted(() => nextTick(() => nameInput.value?.focus()));
 
 <template>
   <Teleport to="body">
-    <div class="fixed inset-0 z-50 flex items-start justify-center pt-[9vh] px-4" @mousedown.self="emit('close')" @keydown.escape="emit('close')">
-      <div class="absolute inset-0 bg-ink/40 backdrop-blur-sm" @click="emit('close')" />
+    <div class="fixed inset-0 z-50 flex items-start justify-center pt-[9vh] px-4" @mousedown.self="requestClose" @keydown.escape="requestClose">
+      <div class="absolute inset-0 bg-ink/40 backdrop-blur-sm" @click="requestClose" />
       <div class="relative w-full max-w-lg bg-surface border border-sand rounded-xl shadow-2xl overflow-hidden">
         <div class="px-5 pt-5 pb-3">
-          <h2 class="font-serif text-xl text-ink">Create a workspace</h2>
+          <h2 class="font-serif text-xl text-ink">{{ firstRun ? 'Welcome to Minutes' : 'Create a workspace' }}</h2>
+          <p v-if="firstRun" class="text-sm text-slate-warm mt-1">Set up your first workspace to get started.</p>
         </div>
 
         <div class="px-5 pb-4">
@@ -90,7 +98,7 @@ onMounted(() => nextTick(() => nameInput.value?.focus()));
         <div class="px-5 py-3 border-t border-sand flex items-center justify-between">
           <span class="text-xs text-slate-warm">{{ picked.size }} module{{ picked.size === 1 ? '' : 's' }} selected</span>
           <div class="flex items-center gap-2">
-            <button class="btn-ghost text-sm" @click="emit('close')">Cancel</button>
+            <button v-if="!firstRun" class="btn-ghost text-sm" @click="emit('close')">Cancel</button>
             <button class="btn-primary text-sm" :disabled="!canCreate" @click="create">Create workspace</button>
           </div>
         </div>

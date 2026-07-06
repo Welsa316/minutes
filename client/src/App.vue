@@ -5,21 +5,27 @@ import CommandPalette from './components/CommandPalette.vue';
 import QuickAdd from './components/QuickAdd.vue';
 import Toaster from './components/Toaster.vue';
 import ShortcutsOverlay from './components/ShortcutsOverlay.vue';
+import WorkspaceCreate from './components/WorkspaceCreate.vue';
 import { useSettingsStore } from './stores/settings.js';
 import { useAuthStore } from './stores/auth.js';
 import { useWorkspaceStore } from './stores/workspace.js';
+import { useUiStore } from './stores/ui.js';
 
 // Initialize so the theme class lands on <html> as early as possible.
 useSettingsStore();
 
 const auth = useAuthStore();
 const ws = useWorkspaceStore();
+const ui = useUiStore();
 const router = useRouter();
 
-// Pull workspaces the moment the user is authed.
+// Pull workspaces the moment the user is authed. A freshly-registered account
+// has none — gate the app behind first-run onboarding until they create one.
 async function bootstrap() {
   if (!auth.checked) await auth.fetchMe();
   if (auth.isAuthenticated && !ws.list.length) await ws.load();
+  if (auth.isAuthenticated && !ws.list.length) ui.openOnboarding();
+  else if (ws.list.length) ui.closeOnboarding();
 }
 
 onMounted(bootstrap);
@@ -45,4 +51,5 @@ watch(() => ws.activeId, () => {
   <QuickAdd />
   <Toaster />
   <ShortcutsOverlay />
+  <WorkspaceCreate v-if="ui.onboarding" first-run @close="ui.closeOnboarding()" />
 </template>

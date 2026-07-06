@@ -21,11 +21,11 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function login(username, password) {
+  async function login(email, password) {
     loading.value = true;
     error.value = null;
     try {
-      const { data } = await api.post('/auth/login', { username, password });
+      const { data } = await api.post('/auth/login', { email, password });
       user.value = data;
       return true;
     } catch (e) {
@@ -37,10 +37,32 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function register(email, password, name) {
+    loading.value = true;
+    error.value = null;
+    try {
+      const { data } = await api.post('/auth/register', { email, password, name });
+      user.value = data;
+      return true;
+    } catch (e) {
+      error.value = e?.response?.data?.error || 'Could not create account';
+      user.value = null;
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function logout() {
     try { await api.post('/auth/logout'); } catch { /* ignore — cookie cleared either way */ }
     user.value = null;
+    // Wipe per-user client state so nothing leaks to the next account signing
+    // in on this browser (recent items, remembered active workspace).
+    try {
+      localStorage.removeItem('minutes:recent');
+      localStorage.removeItem('minutes:workspace');
+    } catch { /* private mode / storage disabled */ }
   }
 
-  return { user, checked, loading, error, isAuthenticated, fetchMe, login, logout };
+  return { user, checked, loading, error, isAuthenticated, fetchMe, login, register, logout };
 });

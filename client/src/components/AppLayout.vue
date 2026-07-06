@@ -14,7 +14,9 @@ const ui = useUiStore();
 
 async function onLogout() {
   await auth.logout();
-  router.replace('/login');
+  // Hard navigation (not router.replace) so all in-memory singletons — the
+  // recents ref, Pinia stores — reset and the next account starts clean.
+  window.location.assign('/login');
 }
 
 // Close the mobile drawer whenever the route changes.
