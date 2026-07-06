@@ -5,5 +5,5 @@
 // remembers it. Fill this in only if you want the app to ship pre-pointed at
 // your server (no first-run prompt).
 module.exports = {
-  DEFAULT_URL: 'https://REPLACE-WITH-YOUR-RAILWAY-URL',
+  DEFAULT_URL: 'https://minutes-production.up.railway.app',
 };
