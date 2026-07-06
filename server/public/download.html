@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Download Minutes</title>
+  <meta name="description" content="Minutes — meeting notes and a personal CRM, as a desktop app for Mac and Windows." />
+  <meta property="og:title" content="Download Minutes" />
+  <meta property="og:description" content="Meeting notes and a personal CRM, as a desktop app for Mac and Windows." />
+  <link rel="icon" href="/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #0F1B2D;
+      --ink-2: #0b1524;
+      --terracotta: #C65D3E;
+      --terracotta-hi: #d97a5a;
+      --warm: #FBF8F3;
+      --sand: #E8DDD0;
+      --muted: #93a4b8;
+      --line: #24384d;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(1100px 520px at 50% -8%, rgba(198,93,62,0.20), transparent 60%),
+        radial-gradient(800px 400px at 85% 10%, rgba(63,107,76,0.10), transparent 55%),
+        var(--ink);
+      color: var(--warm);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 3.5rem 1.25rem 2.5rem;
+    }
+    .wrap { width: 100%; max-width: 680px; text-align: center; }
+
+    .brand { display: inline-flex; align-items: center; gap: .6rem; margin-bottom: 2.25rem; }
+    .mark {
+      width: 34px; height: 34px; border-radius: 9px; background: var(--terracotta);
+      color: #fff; font-family: "IBM Plex Serif", Georgia, serif; font-weight: 600;
+      display: grid; place-items: center; font-size: 1.15rem;
+      box-shadow: 0 6px 20px rgba(198,93,62,0.35);
+    }
+    .brand span { font-weight: 600; letter-spacing: .01em; font-size: 1.05rem; }
+
+    h1 {
+      font-family: "IBM Plex Serif", Georgia, serif; font-weight: 600;
+      font-size: clamp(2.4rem, 7vw, 3.6rem); line-height: 1.05; margin: 0 0 .8rem;
+      letter-spacing: -0.01em;
+    }
+    .tagline { color: #c9d4e0; font-size: clamp(1rem, 2.6vw, 1.2rem); margin: 0 auto 2.2rem; max-width: 30ch; line-height: 1.5; }
+
+    .downloads { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: .6rem;
+      padding: .85rem 1.4rem; border-radius: .7rem; font-size: 1rem; font-weight: 600;
+      text-decoration: none; border: 1px solid transparent; cursor: pointer;
+      transition: transform .12s ease, background .15s ease, border-color .15s ease;
+      white-space: nowrap;
+    }
+    .btn svg { width: 20px; height: 20px; flex: none; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn.primary { background: var(--terracotta); color: #fff; }
+    .btn.primary:hover { background: var(--terracotta-hi); }
+    .btn.ghost { background: rgba(255,255,255,0.04); color: var(--warm); border-color: var(--line); }
+    .btn.ghost:hover { border-color: #3a5570; background: rgba(255,255,255,0.07); }
+    .btn .sub { font-weight: 400; font-size: .78rem; opacity: .7; }
+
+    .meta { color: var(--muted); font-size: .82rem; margin-top: 1.15rem; }
+    .meta a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+    .meta a:hover { color: var(--warm); }
+
+    .features {
+      margin-top: 2.6rem; display: flex; gap: .5rem .9rem; flex-wrap: wrap; justify-content: center;
+      color: var(--muted); font-size: .85rem;
+    }
+    .features span { display: inline-flex; align-items: center; gap: .4rem; }
+    .features .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--terracotta); opacity: .8; }
+
+    details {
+      margin-top: 2.4rem; text-align: left; border: 1px solid var(--line); border-radius: .7rem;
+      background: rgba(255,255,255,0.02); overflow: hidden;
+    }
+    summary {
+      cursor: pointer; padding: .85rem 1.1rem; font-size: .9rem; color: #c9d4e0; list-style: none;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; color: var(--muted); font-size: 1.1rem; }
+    details[open] summary::after { content: "–"; }
+    .howto-body { padding: 0 1.1rem 1.1rem; color: var(--muted); font-size: .86rem; line-height: 1.6; }
+    .howto-body strong { color: #c9d4e0; font-weight: 600; }
+    .howto-body code {
+      background: var(--ink-2); border: 1px solid var(--line); border-radius: 5px;
+      padding: .1rem .4rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82em; color: var(--sand);
+    }
+    .howto-body p { margin: .5rem 0; }
+
+    footer { margin-top: 3rem; color: #5f7286; font-size: .78rem; }
+    footer a { color: #7d90a5; text-decoration: none; }
+    footer a:hover { color: var(--warm); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand"><span class="mark">M</span><span>Minutes</span></div>
+
+    <h1>Minutes on your desktop</h1>
+    <p class="tagline">Meeting notes and a personal CRM, in a native app.</p>
+
+    <div class="downloads" id="downloads">
+      <a class="btn primary" id="btn-mac" href="#" data-os="mac">
+        <svg viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+        <span>Download for Mac<span class="sub"> · Apple Silicon</span></span>
+      </a>
+      <a class="btn ghost" id="btn-win" href="#" data-os="win">
+        <svg viewBox="0 0 448 512" fill="currentColor" aria-hidden="true"><path d="M0 93.7l183.6-25.3v177.4H0V93.7zm0 324.6l183.6 25.3V268.4H0v149.9zm203.8 28L448 480V268.4H203.8v177.9zm0-380.6v180.1H448V32L203.8 65.7z"/></svg>
+        <span>Download for Windows</span>
+      </a>
+    </div>
+
+    <p class="meta"><span id="version">v0.1.1</span> · <a href="/">Prefer the browser? Open the web app →</a></p>
+
+    <div class="features">
+      <span><i class="dot"></i>Meetings</span>
+      <span><i class="dot"></i>Clients</span>
+      <span><i class="dot"></i>Notes</span>
+      <span><i class="dot"></i>Boards</span>
+      <span><i class="dot"></i>To-dos</span>
+    </div>
+
+    <details>
+      <summary>First time opening it?</summary>
+      <div class="howto-body">
+        <p>These builds aren't signed with a paid developer certificate, so your OS shows a one-time warning. Nothing is wrong with the app.</p>
+        <p><strong>macOS</strong> — right-click the app → <strong>Open</strong> → <strong>Open</strong>. If it says "damaged", run this once in Terminal, then open normally:<br>
+        <code>xattr -cr /Applications/Minutes.app</code></p>
+        <p><strong>Windows</strong> — on the SmartScreen prompt, click <strong>More info</strong> → <strong>Run anyway</strong>.</p>
+      </div>
+    </details>
+
+    <footer>Personal build · <a href="https://github.com/Welsa316/minutes/releases" target="_blank" rel="noopener">All releases</a></footer>
+  </div>
+
+  <script>
+    (function () {
+      var REPO = 'Welsa316/minutes';
+      // Fallbacks in case the GitHub API is unreachable/rate-limited.
+      var links = {
+        mac: 'https://github.com/Welsa316/minutes/releases/download/v0.1.1/Minutes-0.1.1-arm64.dmg',
+        win: 'https://github.com/Welsa316/minutes/releases/download/v0.1.1/Minutes.Setup.0.1.1.exe'
+      };
+      var macBtn = document.getElementById('btn-mac');
+      var winBtn = document.getElementById('btn-win');
+      macBtn.href = links.mac;
+      winBtn.href = links.win;
+
+      // Highlight the visitor's platform: make it the primary button and put it first.
+      var ua = navigator.userAgent || '';
+      var isWin = /Windows/i.test(ua);
+      if (isWin) {
+        winBtn.classList.remove('ghost'); winBtn.classList.add('primary');
+        macBtn.classList.remove('primary'); macBtn.classList.add('ghost');
+        var dl = document.getElementById('downloads');
+        dl.insertBefore(winBtn, macBtn);
+      }
+
+      // Pull the latest release so links + version stay current automatically.
+      fetch('https://api.github.com/repos/' + REPO + '/releases/latest')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (rel) {
+          if (!rel || !rel.assets) return;
+          var dmg = rel.assets.find(function (a) { return /\.dmg$/i.test(a.name); });
+          var exe = rel.assets.find(function (a) { return /\.exe$/i.test(a.name); });
+          if (dmg) macBtn.href = dmg.browser_download_url;
+          if (exe) winBtn.href = exe.browser_download_url;
+          if (rel.tag_name) document.getElementById('version').textContent = rel.tag_name;
+        })
+        .catch(function () {});
+    })();
+  </script>
+</body>
+</html>

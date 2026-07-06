@@ -73,6 +73,12 @@ app.use('/api/uploads',      requireAuth, uploadsRoutes);
 // Boards (Trello-style) attached to notes/meetings — workspace-scoped.
 app.use('/api/boards',       requireAuth, workspaceScope, boardsRoutes);
 
+// Public desktop-app download page (no auth) — registered before the SPA
+// fallback so /download serves the landing page, not the app shell.
+app.get('/download', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'download.html'));
+});
+
 // In production, serve the built client from /client/dist. SPA fallback: any
 // non-/api request goes to index.html so vue-router can handle the route.
 if (isProd) {
