@@ -41,7 +41,7 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach(async (to) => {
+router.beforeEach(async (to, from) => {
   const auth = useAuthStore();
   if (!auth.checked) await auth.fetchMe();
 
@@ -49,6 +49,13 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : undefined };
   }
   if (to.name === 'login' && auth.isAuthenticated) {
+    return { name: 'home' };
+  }
+  // Opening the app fresh (initial navigation, no prior route) drops you on the
+  // dashboard by default — send that first landing to the universal home portal
+  // instead. Internal navigation to the dashboard (from has a name) is untouched,
+  // so the sidebar "Dashboard" link and the portal dive still work normally.
+  if (auth.isAuthenticated && to.name === 'dashboard' && !from.name) {
     return { name: 'home' };
   }
 });
