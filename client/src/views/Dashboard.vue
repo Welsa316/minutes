@@ -85,8 +85,8 @@ onMounted(load);
 <template>
   <div class="space-y-6 max-w-5xl">
     <header class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2">
-      <h1 class="text-2xl sm:text-3xl font-serif text-ink">{{ greeting }}</h1>
-      <div class="flex items-center gap-3 sm:gap-4 text-xs text-slate-warm tabular-nums flex-wrap">
+      <h1 class="text-2xl sm:text-3xl font-serif text-ink reveal">{{ greeting }}</h1>
+      <div class="flex items-center gap-3 sm:gap-4 text-xs text-slate-warm tabular-nums flex-wrap reveal" style="--reveal-delay: 120ms">
         <span><CountUp :value="totals.clients" /> clients</span>
         <span><CountUp :value="totals.projects" /> projects</span>
         <span><CountUp :value="totals.meetings" /> meetings</span>
@@ -96,15 +96,15 @@ onMounted(load);
 
     <Skeleton v-if="loading" variant="dashboard" />
     <template v-else>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <section class="card">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 reveal-group">
+        <section class="card lift">
           <div class="flex items-baseline justify-between mb-3">
             <h2 class="font-serif text-lg text-ink">Upcoming meetings</h2>
             <RouterLink to="/meetings" class="text-xs text-slate-warm hover:text-ink">All →</RouterLink>
           </div>
-          <ul v-if="upcoming.length" class="space-y-2">
+          <ul v-if="upcoming.length" class="space-y-2 stagger">
             <li v-for="m in upcoming" :key="m.id">
-              <button @click="open('meetings', m)" class="block w-full text-left group">
+              <button @click="open('meetings', m)" class="block w-full text-left group row-nudge">
                 <div class="text-sm font-medium text-ink truncate group-hover:text-terracotta">{{ m.title }}</div>
                 <div class="text-xs text-slate-warm flex items-center gap-1.5">
                   <span
@@ -121,14 +121,14 @@ onMounted(load);
           <p v-else class="text-sm text-slate-warm">None.</p>
         </section>
 
-        <section class="card">
+        <section class="card lift">
           <div class="flex items-baseline justify-between mb-3">
             <h2 class="font-serif text-lg text-ink">Active projects</h2>
             <RouterLink to="/projects?status=active" class="text-xs text-slate-warm hover:text-ink">All →</RouterLink>
           </div>
-          <ul v-if="active.length" class="space-y-2">
+          <ul v-if="active.length" class="space-y-2 stagger">
             <li v-for="p in active" :key="p.id">
-              <button @click="open('projects', p)" class="block w-full text-left group">
+              <button @click="open('projects', p)" class="block w-full text-left group row-nudge">
                 <div class="text-sm font-medium text-ink truncate group-hover:text-terracotta">{{ p.name }}</div>
                 <div class="text-xs text-slate-warm flex items-center gap-1.5">
                   <span
@@ -150,14 +150,14 @@ onMounted(load);
           <p v-else class="text-sm text-slate-warm">None.</p>
         </section>
 
-        <section class="card">
+        <section class="card lift">
           <div class="flex items-baseline justify-between mb-3">
             <h2 class="font-serif text-lg text-ink">Recent notes</h2>
             <RouterLink to="/notes" class="text-xs text-slate-warm hover:text-ink">All →</RouterLink>
           </div>
-          <ul v-if="recent.length" class="space-y-2">
+          <ul v-if="recent.length" class="space-y-2 stagger">
             <li v-for="n in recent" :key="n.id">
-              <button @click="open('notes', n)" class="block w-full text-left group">
+              <button @click="open('notes', n)" class="block w-full text-left group row-nudge">
                 <div class="text-sm font-medium text-ink truncate group-hover:text-terracotta">{{ n.title }}</div>
                 <div class="text-xs text-slate-warm flex items-center gap-1.5">
                   <span
@@ -175,7 +175,7 @@ onMounted(load);
         </section>
       </div>
 
-      <section class="card">
+      <section class="card reveal" style="--reveal-delay: 300ms">
         <div class="flex items-baseline justify-between mb-3">
           <h2 class="font-serif text-lg text-ink">Activity</h2>
           <span class="text-xs text-slate-warm">last 6 months · all workspaces</span>
@@ -183,11 +183,11 @@ onMounted(load);
         <Heatmap :events="allMeetings.filter(m => m.date).map(m => ({ date: m.date }))" />
       </section>
 
-      <section v-if="onThisDay.length" class="card">
+      <section v-if="onThisDay.length" class="card reveal" style="--reveal-delay: 380ms">
         <h2 class="font-serif text-lg text-ink mb-3">On this day</h2>
-        <ul class="space-y-2">
+        <ul class="space-y-2 stagger">
           <li v-for="m in onThisDay" :key="`${m.yearsAgo}-${m.id}`">
-            <button @click="open('meetings', m)" class="block w-full text-left group flex items-center gap-3">
+            <button @click="open('meetings', m)" class="block w-full text-left group row-nudge flex items-center gap-3">
               <span class="text-xs text-slate-warm tabular-nums w-20 shrink-0">{{ m.yearsAgo }} year{{ m.yearsAgo === 1 ? '' : 's' }} ago</span>
               <span class="text-sm font-medium text-ink truncate group-hover:text-terracotta">{{ m.title }}</span>
               <ClientChip v-if="m.client_name" :name="m.client_name" :id="m.client_id" size="sm" :hover="false" />

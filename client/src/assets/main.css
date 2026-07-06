@@ -167,3 +167,50 @@
 @media (prefers-reduced-motion: reduce) {
   .stagger > * { animation: none; }
 }
+
+/* ---- Luxury entrance: content rises + settles, gently choreographed ---- */
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* fill-mode: backwards (not both) — holds the pre-start state during the delay
+   but reverts to the base after, so .lift's hover transform isn't blocked. */
+.reveal {
+  animation: reveal-up 640ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+/* A container that cascades its direct children in, one after another. */
+.reveal-group > * {
+  animation: reveal-up 640ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.reveal-group > *:nth-child(1) { animation-delay: 60ms; }
+.reveal-group > *:nth-child(2) { animation-delay: 140ms; }
+.reveal-group > *:nth-child(3) { animation-delay: 220ms; }
+.reveal-group > *:nth-child(4) { animation-delay: 300ms; }
+.reveal-group > *:nth-child(5) { animation-delay: 380ms; }
+.reveal-group > *:nth-child(n+6) { animation-delay: 460ms; }
+
+/* ---- Soft interactive depth for surfaces (transform/opacity only) ---- */
+.lift {
+  transition: transform 340ms cubic-bezier(0.2, 0.8, 0.2, 1),
+              box-shadow 340ms ease, border-color 340ms ease;
+  will-change: transform;
+}
+.lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 38px -14px rgba(15, 27, 45, 0.22);
+  border-color: rgba(198, 93, 62, 0.32);
+}
+
+/* ---- List rows that nudge toward you on hover ---- */
+.row-nudge { transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.group:hover > .row-nudge,
+.row-nudge.group:hover { transform: translateX(3px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal-group > * { animation: none; }
+  .lift, .row-nudge { transition: none; }
+  .lift:hover { transform: none; }
+  .group:hover > .row-nudge, .row-nudge.group:hover { transform: none; }
+}
