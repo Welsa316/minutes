@@ -11,7 +11,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <script>try{if(document.visibilityState==='visible'&&!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches))document.documentElement.className+=' reveal';}catch(e){}</script>
   <style>
     :root {
       --paper: #efe7da; --paper-2: #e7dccb; --ink: #172234; --ink-2: #3f4d63;
@@ -67,8 +66,7 @@
     .chips i { width: 5px; height: 5px; border-radius: 50%; background: var(--terra); }
 
     .art { position: relative; height: min(76vh, 660px); }
-    .art canvas { width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 1.1s ease; cursor: grab; }
-    .art.ready canvas { opacity: 1; }
+    .art canvas { width: 100%; height: 100%; display: block; cursor: grab; }
     .art .fallback { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
     .art.nowebgl canvas { display: none; }
     .art.nowebgl .fallback { display: flex; }
@@ -89,9 +87,13 @@
     footer a { color: var(--muted); text-decoration: none; }
     footer a:hover { color: var(--ink); }
 
-    .reveal .rise { opacity: 0; animation: rise .95s cubic-bezier(.2,.75,.2,1) forwards; }
-    @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
-    .reveal .art canvas { transition: opacity 1.3s ease .2s; }
+    /* Entrance animates transform only — opacity is never touched, so content
+       can never be left invisible if the animation is paused (hidden tab) or
+       doesn't run. */
+    @media (prefers-reduced-motion: no-preference) {
+      .rise { animation: rise .9s cubic-bezier(.2,.75,.2,1) both; }
+    }
+    @keyframes rise { from { transform: translateY(16px); } to { transform: none; } }
 
     @media (max-width: 900px) {
       .hero { grid-template-columns: 1fr; min-height: 0; gap: 1rem; margin-top: 1.5rem; }
