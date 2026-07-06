@@ -28,8 +28,25 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        navigateFallbackDenylist: [/^\/api\//],
+        cleanupOutdatedCaches: true,
+        // Don't pin navigations to a precached index.html — that's the "stale app"
+        // trap where a new deploy never shows up. Serve the shell network-first
+        // instead (see the first runtimeCaching rule below), so every launch
+        // fetches the latest build and only falls back to cache when offline.
+        navigateFallback: null,
         runtimeCaching: [
+          {
+            // App shell / page loads: network-first so new deploys appear on the
+            // next launch. Falls back to the last cached shell when offline.
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'minutes-shell',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             // API calls: try the network first so data stays fresh, fall back to cache offline.
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
