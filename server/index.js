@@ -24,6 +24,7 @@ import dashboardRoutes from './routes/dashboard.js';
 import { workspaceScope } from './middleware/workspace.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { bootstrapOwner } from './bootstrapOwner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -98,6 +99,13 @@ if (isProd) {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Minutes server listening on :${PORT} (${isProd ? 'production' : 'development'})`);
+  // Migrate the legacy single-user owner into the users table + claim its data.
+  // Runs after migrations (chained in `npm start`), so the users table exists.
+  try {
+    await bootstrapOwner();
+  } catch (e) {
+    console.error('[bootstrapOwner] failed:', e.message);
+  }
 });

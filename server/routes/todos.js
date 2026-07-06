@@ -3,14 +3,15 @@ import { query } from '../db/index.js';
 
 const router = Router();
 
-// Todos are GLOBAL — workspace_id is an optional visual tag, not a filter.
-// Mounted without workspaceScope so req.workspaceId is irrelevant here.
+// Todos are GLOBAL PER USER — workspace_id is an optional visual tag, not a
+// filter. Mounted without workspaceScope, so req.workspaceId is irrelevant, but
+// every query is scoped to req.userId so one account never sees another's todos.
 
 router.get('/', async (req, res, next) => {
   try {
     const { done, trash, workspace_id } = req.query;
-    const params = [];
-    const conds = [trash === 'true' ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL'];
+    const params = [req.userId];
+    const conds = ['t.user_id = $1', trash === 'true' ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL'];
     if (done === 'true' || done === 'false') {
       params.push(done === 'true');
       conds.push(`done = $${params.length}`);
@@ -38,9 +39,9 @@ router.post('/', async (req, res, next) => {
     const { label, due_date, priority, notes, workspace_id } = req.body || {};
     if (!label?.trim()) return res.status(400).json({ error: 'label required' });
     const { rows } = await query(
-      `INSERT INTO todos (workspace_id, label, due_date, priority, notes)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [workspace_id || null, label.trim(), due_date || null, priority || null, notes || null],
+      `INSERT INTO todos (workspace_id, label, due_date, priority, notes, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [workspace_id || null, label.trim(), due_date || null, priority || null, notes || null, req.userId],
     );
     res.status(201).json(rows[0]);
   } catch (e) { next(e); }
@@ -63,8 +64,10 @@ router.put('/:id', async (req, res, next) => {
     }
     if (!sets.length) return res.status(400).json({ error: 'no fields to update' });
     params.push(req.params.id);
+    const idPos = params.length;
+    params.push(req.userId);
     const { rows } = await query(
-      `UPDATE todos SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`,
+      `UPDATE todos SET ${sets.join(', ')} WHERE id = $${idPos} AND user_id = $${params.length} RETURNING *`,
       params,
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
@@ -75,8 +78,8 @@ router.put('/:id', async (req, res, next) => {
 router.patch('/:id/toggle', async (req, res, next) => {
   try {
     const { rows } = await query(
-      'UPDATE todos SET done = NOT done WHERE id = $1 RETURNING *',
-      [req.params.id],
+      'UPDATE todos SET done = NOT done WHERE id = $1 AND user_id = $2 RETURNING *',
+      [req.params.id, req.userId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);
@@ -86,8 +89,8 @@ router.patch('/:id/toggle', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const r = await query(
-      'UPDATE todos SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL',
-      [req.params.id],
+      'UPDATE todos SET deleted_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL',
+      [req.params.id, req.userId],
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
     res.status(204).end();
@@ -97,8 +100,8 @@ router.delete('/:id', async (req, res, next) => {
 router.post('/:id/restore', async (req, res, next) => {
   try {
     const { rows } = await query(
-      'UPDATE todos SET deleted_at = NULL WHERE id = $1 RETURNING *',
-      [req.params.id],
+      'UPDATE todos SET deleted_at = NULL WHERE id = $1 AND user_id = $2 RETURNING *',
+      [req.params.id, req.userId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);

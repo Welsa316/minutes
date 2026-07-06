@@ -1,34 +1,33 @@
 import { query } from '../db/index.js';
 
-let cachedWorkspaces = null;
-let cachedAt = 0;
+// No-op kept for import compatibility (there is no longer a global cache — we
+// query per request, scoped to the user, so nothing can leak across accounts).
+export function invalidateWorkspaceCache() {}
 
-async function getAllWorkspaces() {
-  // Tiny cache — workspaces change rarely.
-  if (cachedWorkspaces && Date.now() - cachedAt < 5_000) return cachedWorkspaces;
-  const { rows } = await query('SELECT id, slug FROM workspaces');
-  cachedWorkspaces = rows;
-  cachedAt = Date.now();
-  return rows;
-}
-
-export function invalidateWorkspaceCache() {
-  cachedWorkspaces = null;
-}
-
-// Reads X-Workspace-Id (numeric) or X-Workspace-Slug from the request and
-// attaches req.workspaceId. Falls back to the lowest-id workspace (Freelance)
-// so legacy callers without the header still work.
+// Resolve the active workspace from the request header, but ONLY among the
+// logged-in user's workspaces. This is the isolation boundary: every
+// workspace-scoped route filters by req.workspaceId, so as long as we never
+// hand back someone else's workspace, their data stays private.
 export async function workspaceScope(req, res, next) {
   try {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ error: 'unauthorized' });
+
     const headerId = Number(req.get('X-Workspace-Id')) || null;
     const headerSlug = req.get('X-Workspace-Slug') || null;
-    const list = await getAllWorkspaces();
+
     let ws = null;
-    if (headerId) ws = list.find((w) => w.id === headerId);
-    if (!ws && headerSlug) ws = list.find((w) => w.slug === headerSlug);
-    if (!ws) ws = list[0]; // default to first (Freelance after migration)
-    if (!ws) return res.status(500).json({ error: 'no workspaces configured' });
+    if (headerId) {
+      ws = (await query('SELECT id, slug FROM workspaces WHERE id = $1 AND user_id = $2', [headerId, userId])).rows[0];
+    }
+    if (!ws && headerSlug) {
+      ws = (await query('SELECT id, slug FROM workspaces WHERE slug = $1 AND user_id = $2', [headerSlug, userId])).rows[0];
+    }
+    if (!ws) {
+      ws = (await query('SELECT id, slug FROM workspaces WHERE user_id = $1 ORDER BY sort_order ASC, id ASC LIMIT 1', [userId])).rows[0];
+    }
+    if (!ws) return res.status(404).json({ error: 'no workspace', code: 'NO_WORKSPACE' });
+
     req.workspaceId = ws.id;
     req.workspaceSlug = ws.slug;
     next();

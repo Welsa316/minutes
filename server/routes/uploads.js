@@ -21,18 +21,19 @@ router.post('/', express.raw({ type: () => true, limit: '20mb' }), async (req, r
     if (buf.length > MAX_BYTES) return res.status(413).json({ error: 'image too large (max 20MB)' });
 
     const { rows } = await query(
-      'INSERT INTO attachments (mime, bytes, size) VALUES ($1, $2, $3) RETURNING id',
-      [mime, buf, buf.length],
+      'INSERT INTO attachments (mime, bytes, size, user_id) VALUES ($1, $2, $3, $4) RETURNING id',
+      [mime, buf, buf.length, req.userId],
     );
     res.status(201).json({ id: rows[0].id, url: `/api/uploads/${rows[0].id}` });
   } catch (e) { next(e); }
 });
 
 // GET the image bytes. Same-origin <img> requests carry the auth cookie, so
-// requireAuth (mounted in index.js) still protects these.
+// requireAuth (mounted in index.js) still protects these, and we scope to the
+// owner so one account can't fetch another's attachment by guessing an id.
 router.get('/:id', async (req, res, next) => {
   try {
-    const { rows } = await query('SELECT mime, bytes FROM attachments WHERE id = $1', [req.params.id]);
+    const { rows } = await query('SELECT mime, bytes FROM attachments WHERE id = $1 AND user_id = $2', [req.params.id, req.userId]);
     if (!rows[0]) return res.status(404).end();
     res.set('Content-Type', rows[0].mime);
     res.set('Cache-Control', 'private, max-age=31536000, immutable');
