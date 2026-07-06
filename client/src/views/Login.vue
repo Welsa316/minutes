@@ -23,7 +23,7 @@ function toggleMode() {
 }
 
 function goAfterAuth() {
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/';
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/home';
   router.replace(redirect);
 }
 

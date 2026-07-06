@@ -1,12 +1,16 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { useRouter } from 'vue-router';
 import { useWorkspaceStore } from '../stores/workspace.js';
 import WorkspaceCreate from './WorkspaceCreate.vue';
 
+const router = useRouter();
 const ws = useWorkspaceStore();
 const open = ref(false);
 const wrapper = ref(null);
 const showCreate = ref(false);
+
+function goHome() { open.value = false; router.push('/home'); }
 
 const accent = computed(() => ws.active?.color ? `#${ws.active.color}` : '#0F1B2D');
 const initial = computed(() => ws.active?.icon || ws.active?.name?.[0] || '?');
@@ -64,6 +68,11 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
       </button>
 
       <div class="border-t border-sand mt-1 pt-1">
+        <button
+          type="button"
+          @click="goHome"
+          class="w-full px-3 py-2 text-left text-xs text-slate-warm hover:text-ink hover:bg-sand/50"
+        >⌂ All workspaces</button>
         <button
           type="button"
           @click="openCreate"

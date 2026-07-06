@@ -9,6 +9,12 @@ const routes = [
     meta: { public: true },
   },
   {
+    // Universal home: a full-screen workspace launcher, outside the app shell.
+    path: '/home',
+    name: 'home',
+    component: () => import('../views/WorkspacePortal.vue'),
+  },
+  {
     path: '/',
     component: () => import('../components/AppLayout.vue'),
     children: [
@@ -43,7 +49,7 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : undefined };
   }
   if (to.name === 'login' && auth.isAuthenticated) {
-    return { name: 'dashboard' };
+    return { name: 'home' };
   }
 });
 
