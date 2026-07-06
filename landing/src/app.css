@@ -47,8 +47,12 @@ h1 { font-family: "IBM Plex Serif", Georgia, serif; font-weight: 500; color: var
 .sep { width: 3px; height: 3px; border-radius: 50%; background: #b6aa97; }
 
 .chips { margin-top: 2.4rem; display: flex; gap: .5rem 1rem; flex-wrap: wrap; color: var(--muted); font-size: .84rem; }
-.chips span { display: inline-flex; align-items: center; gap: .42rem; }
-.chips i { width: 5px; height: 5px; border-radius: 50%; background: var(--terra); }
+.chips .chip { display: inline-flex; align-items: center; gap: .42rem; cursor: default; outline: none;
+  transition: color .25s, transform .25s cubic-bezier(.2,.8,.2,1); }
+.chips .chip i { width: 5px; height: 5px; border-radius: 50%; background: var(--terra);
+  transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s; }
+.chips .chip.on { color: var(--ink); transform: translateY(-1px); }
+.chips .chip.on i { transform: scale(1.8); box-shadow: 0 0 0 3px rgba(198,93,62,.16); }
 
 .art { position: relative; height: min(78vh, 680px); }
 .art :global(canvas) { display: block; cursor: grab; }

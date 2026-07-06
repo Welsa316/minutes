@@ -3,6 +3,7 @@
   import { Canvas } from '@threlte/core';
   import { onMount } from 'svelte';
   import Scene from './Scene.svelte';
+  import { hoveredCard, FEATURES } from './stores.js';
 
   const REPO = 'Welsa316/minutes';
   let version = 'v0.1.1';
@@ -63,7 +64,18 @@
       <p class="meta rise" style="animation-delay:.5s"><span>{version}</span><i class="sep"></i><a href="https://minutes-production.up.railway.app">Prefer the browser? Open the web app →</a></p>
 
       <div class="chips rise" style="animation-delay:.6s">
-        <span><i></i>Meetings</span><span><i></i>Clients</span><span><i></i>Notes</span><span><i></i>Boards</span><span><i></i>To-dos</span>
+        {#each FEATURES as feat, i}
+          <span
+            class="chip"
+            class:on={$hoveredCard === i}
+            role="button"
+            tabindex="0"
+            on:mouseenter={() => hoveredCard.set(i)}
+            on:mouseleave={() => hoveredCard.set(null)}
+            on:focus={() => hoveredCard.set(i)}
+            on:blur={() => hoveredCard.set(null)}
+          ><i></i>{feat}</span>
+        {/each}
       </div>
     </div>
 
