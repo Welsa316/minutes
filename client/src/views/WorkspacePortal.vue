@@ -32,7 +32,7 @@ function ringStyle(i) {
     '--sz': `${620 + (i % 3) * 70}px`,
     '--dur': `${DUR}s`,
     '--delay': `${-(i / RINGS) * DUR}s`,
-    '--clr': i % 2 ? 'rgb(var(--c-terracotta) / 0.5)' : 'rgb(var(--c-ink) / 0.2)',
+    '--clr': `rgb(var(--c-terracotta) / ${i % 2 ? 0.85 : 0.55})`,
   };
 }
 
@@ -133,14 +133,14 @@ async function onLogout() {
   position: absolute; top: 50%; left: 50%;
   width: var(--sz); height: var(--sz);
   margin-left: calc(var(--sz) / -2); margin-top: calc(var(--sz) / -2);
-  border-radius: 50%; border: 1.6px solid var(--clr);
+  border-radius: 50%; border: 2px solid var(--clr);
   animation: tunnel var(--dur) linear infinite; animation-delay: var(--delay);
   will-change: transform, opacity;
 }
 @keyframes tunnel {
   0%   { transform: translateZ(-1500px); opacity: 0; }
-  12%  { opacity: .6; }
-  82%  { opacity: .5; }
+  14%  { opacity: .9; }
+  80%  { opacity: .8; }
   100% { transform: translateZ(660px); opacity: 0; }
 }
 
