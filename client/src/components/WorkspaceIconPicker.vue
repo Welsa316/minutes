@@ -10,7 +10,7 @@ defineEmits(['update:modelValue']);
 </script>
 
 <template>
-  <div class="grid grid-cols-8 gap-1">
+  <div class="grid grid-cols-8 gap-1 max-h-44 overflow-y-auto pr-1">
     <button
       v-for="k in WS_ICON_KEYS"
       :key="k"
