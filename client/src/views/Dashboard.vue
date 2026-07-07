@@ -40,6 +40,16 @@ const greeting = computed(() => {
 // More than one workspace in play? Then the little workspace tags are useful.
 const multiWorkspace = computed(() => ws.list.length > 1);
 
+const dateLine = computed(() =>
+  new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }),
+);
+const stats = computed(() => [
+  { label: 'Clients', value: totals.value.clients },
+  { label: 'Projects', value: totals.value.projects },
+  { label: 'Meetings', value: totals.value.meetings },
+  { label: 'Notes', value: totals.value.notes },
+]);
+
 // "On this day" — meetings from exactly 1, 2, 3 years ago (across all workspaces).
 const onThisDay = computed(() => {
   const today = new Date();
@@ -90,21 +100,36 @@ onMounted(load);
 </script>
 
 <template>
-  <div class="space-y-6 max-w-5xl">
-    <header class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2">
-      <h1 class="text-2xl sm:text-3xl font-serif text-ink reveal">{{ greeting }}</h1>
-      <div class="flex items-center gap-3 sm:gap-4 text-xs text-slate-warm tabular-nums flex-wrap reveal" style="--reveal-delay: 120ms">
-        <span><CountUp :value="totals.clients" /> clients</span>
-        <span><CountUp :value="totals.projects" /> projects</span>
-        <span><CountUp :value="totals.meetings" /> meetings</span>
-        <span><CountUp :value="totals.notes" /> notes</span>
+  <div class="max-w-6xl">
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6 reveal">
+      <div>
+        <h1 class="text-3xl sm:text-4xl font-serif text-ink leading-tight">{{ greeting }}</h1>
+        <p class="text-sm text-slate-warm mt-1">{{ dateLine }}</p>
       </div>
-    </header>
+      <RouterLink to="/meetings/new" class="btn-primary text-sm inline-flex items-center gap-1.5 self-start sm:self-auto shrink-0">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+        New meeting
+      </RouterLink>
+    </div>
 
     <Skeleton v-if="loading" variant="dashboard" />
     <template v-else>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 reveal-group">
-        <section class="card lift">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-4 auto-rows-min reveal-group">
+        <!-- Overview metrics (hero) -->
+        <section class="card lift md:col-span-8">
+          <div class="flex items-center justify-between mb-5">
+            <h2 class="font-serif text-lg text-ink">Overview</h2>
+            <span class="text-xs text-slate-warm">across {{ ws.list.length }} workspace{{ ws.list.length === 1 ? '' : 's' }}</span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-5">
+            <div v-for="s in stats" :key="s.label" class="border-l-2 border-terracotta/25 pl-3">
+              <div class="text-xs text-slate-warm mb-1.5">{{ s.label }}</div>
+              <div class="text-3xl font-serif text-ink tabular-nums leading-none"><CountUp :value="s.value" /></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card lift md:col-span-4">
           <div class="flex items-baseline justify-between mb-3">
             <h2 class="font-serif text-lg text-ink">Upcoming meetings</h2>
             <RouterLink to="/meetings" class="text-xs text-slate-warm hover:text-ink">All →</RouterLink>
@@ -128,7 +153,7 @@ onMounted(load);
           <p v-else class="text-sm text-slate-warm">None.</p>
         </section>
 
-        <section class="card lift">
+        <section class="card lift md:col-span-6">
           <div class="flex items-baseline justify-between mb-3">
             <h2 class="font-serif text-lg text-ink">Active projects</h2>
             <RouterLink to="/projects?status=active" class="text-xs text-slate-warm hover:text-ink">All →</RouterLink>
@@ -157,7 +182,7 @@ onMounted(load);
           <p v-else class="text-sm text-slate-warm">None.</p>
         </section>
 
-        <section class="card lift">
+        <section class="card lift md:col-span-6">
           <div class="flex items-baseline justify-between mb-3">
             <h2 class="font-serif text-lg text-ink">Recent notes</h2>
             <RouterLink to="/notes" class="text-xs text-slate-warm hover:text-ink">All →</RouterLink>
@@ -180,28 +205,28 @@ onMounted(load);
           </ul>
           <p v-else class="text-sm text-slate-warm">None.</p>
         </section>
+
+        <section class="card md:col-span-12">
+          <div class="flex items-baseline justify-between mb-3">
+            <h2 class="font-serif text-lg text-ink">Activity</h2>
+            <span class="text-xs text-slate-warm">last 6 months · all workspaces</span>
+          </div>
+          <Heatmap :events="allMeetings.filter(m => m.date).map(m => ({ date: m.date }))" />
+        </section>
+
+        <section v-if="onThisDay.length" class="card md:col-span-12">
+          <h2 class="font-serif text-lg text-ink mb-3">On this day</h2>
+          <ul class="space-y-2 stagger">
+            <li v-for="m in onThisDay" :key="`${m.yearsAgo}-${m.id}`">
+              <button @click="open('meetings', m)" class="block w-full text-left group row-nudge flex items-center gap-3">
+                <span class="text-xs text-slate-warm tabular-nums w-20 shrink-0">{{ m.yearsAgo }} year{{ m.yearsAgo === 1 ? '' : 's' }} ago</span>
+                <span class="text-sm font-medium text-ink truncate group-hover:text-terracotta">{{ m.title }}</span>
+                <ClientChip v-if="m.client_name" :name="m.client_name" :id="m.client_id" size="sm" :hover="false" />
+              </button>
+            </li>
+          </ul>
+        </section>
       </div>
-
-      <section class="card reveal" style="--reveal-delay: 300ms">
-        <div class="flex items-baseline justify-between mb-3">
-          <h2 class="font-serif text-lg text-ink">Activity</h2>
-          <span class="text-xs text-slate-warm">last 6 months · all workspaces</span>
-        </div>
-        <Heatmap :events="allMeetings.filter(m => m.date).map(m => ({ date: m.date }))" />
-      </section>
-
-      <section v-if="onThisDay.length" class="card reveal" style="--reveal-delay: 380ms">
-        <h2 class="font-serif text-lg text-ink mb-3">On this day</h2>
-        <ul class="space-y-2 stagger">
-          <li v-for="m in onThisDay" :key="`${m.yearsAgo}-${m.id}`">
-            <button @click="open('meetings', m)" class="block w-full text-left group row-nudge flex items-center gap-3">
-              <span class="text-xs text-slate-warm tabular-nums w-20 shrink-0">{{ m.yearsAgo }} year{{ m.yearsAgo === 1 ? '' : 's' }} ago</span>
-              <span class="text-sm font-medium text-ink truncate group-hover:text-terracotta">{{ m.title }}</span>
-              <ClientChip v-if="m.client_name" :name="m.client_name" :id="m.client_id" size="sm" :hover="false" />
-            </button>
-          </li>
-        </ul>
-      </section>
     </template>
 
     <!-- Corner light/dark toggle -->
