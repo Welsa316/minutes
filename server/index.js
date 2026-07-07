@@ -21,6 +21,9 @@ import todosRoutes from './routes/todos.js';
 import uploadsRoutes from './routes/uploads.js';
 import boardsRoutes from './routes/boards.js';
 import dashboardRoutes from './routes/dashboard.js';
+import feedbackRoutes from './routes/feedback.js';
+import ideasRoutes from './routes/ideas.js';
+import metricsRoutes from './routes/metrics.js';
 import { workspaceScope } from './middleware/workspace.js';
 import { requireAuth } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -61,6 +64,9 @@ app.use('/api/search',       requireAuth, workspaceScope, searchRoutes);
 app.use('/api/tags',         requireAuth, workspaceScope, tagsRoutes);
 app.use('/api/pinned',       requireAuth, workspaceScope, pinnedRoutes);
 app.use('/api/saved-views',  requireAuth, workspaceScope, savedViewsRoutes);
+app.use('/api/feedback',     requireAuth, workspaceScope, feedbackRoutes);
+app.use('/api/ideas',        requireAuth, workspaceScope, ideasRoutes);
+app.use('/api/metrics',      requireAuth, workspaceScope, metricsRoutes);
 
 // Todos are app-global. No workspaceScope.
 app.use('/api/todos',        requireAuth, todosRoutes);
