@@ -1,6 +1,6 @@
 {
   "name": "minutes-desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Minutes desktop app — native window for the Minutes web app",
   "author": "WalidAlHakim",
   "private": true,

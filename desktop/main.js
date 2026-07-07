@@ -57,8 +57,15 @@ function createWindow() {
 
   loadPromptOrApp();
 
-  // Links to a different origin open in the system browser, not inside the app.
+  // Links to a different origin open in the system browser, not inside the app —
+  // EXCEPT Google's sign-in popup, which must open as a child window so it can
+  // post the credential back to the opener (opening it externally dead-ends it).
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    let host = '';
+    try { host = new URL(url).hostname; } catch { /* leave empty */ }
+    if (/(^|\.)(google\.com|googleusercontent\.com)$/i.test(host)) {
+      return { action: 'allow', overrideBrowserWindowOptions: { width: 480, height: 640, autoHideMenuBar: true } };
+    }
     if (originOf(url) !== originOf(configuredUrl())) { shell.openExternal(url); return { action: 'deny' }; }
     return { action: 'allow' };
   });

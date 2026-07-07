@@ -15,10 +15,12 @@ const password = ref('');
 const name = ref('');
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-// Google's OAuth popup doesn't work reliably inside the Electron desktop shell,
-// so only offer it in a real browser. Desktop users sign in with a password.
+// Google's OAuth popup only works in a real browser, or in a desktop shell new
+// enough to host the popup (which advertises itself via window.minutes.oauth).
+// Older shells omit that flag, so the button stays hidden and doesn't dead-end.
 const isElectron = typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent);
-const showGoogle = GOOGLE_CLIENT_ID && !isElectron;
+const desktopCanOAuth = typeof window !== 'undefined' && window.minutes?.oauth === true;
+const showGoogle = !!GOOGLE_CLIENT_ID && (!isElectron || desktopCanOAuth);
 let tokenClient = null;
 
 function toggleMode() {
