@@ -95,4 +95,12 @@ function withTransition(fn) {
 router.push = withTransition(originalPush);
 router.replace = withTransition(originalReplace);
 
+// Navigate without the View Transitions cross-fade. The workspace portal plays
+// its own full-screen dive animation; stacking the root cross-fade on top of it
+// raced with the app-shell's own transition and could leave the dive's terracotta
+// snapshot frozen over the app. The portal hands off through this instead.
+export function pushWithoutTransition(to) {
+  return originalPush(to);
+}
+
 export default router;

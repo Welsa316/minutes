@@ -1,12 +1,11 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
-import { useRouter } from 'vue-router';
+import { pushWithoutTransition } from '../router/index.js';
 import { useAuthStore } from '../stores/auth.js';
 import { useWorkspaceStore } from '../stores/workspace.js';
 import WorkspaceCreate from '../components/WorkspaceCreate.vue';
 import WorkspaceIcon from '../components/WorkspaceIcon.vue';
 
-const router = useRouter();
 const auth = useAuthStore();
 const ws = useWorkspaceStore();
 
@@ -66,11 +65,12 @@ function accent(w) { return w.color ? `#${w.color}` : '#0F1B2D'; }
 function enter(w) {
   if (diving.value) return; // guard against a second click mid-dive
   ws.setActive(w.id);
-  if (reduce) { router.push('/'); return; }
+  // Bypass the router's View Transitions cross-fade — the dive IS the transition.
+  if (reduce) { pushWithoutTransition('/'); return; }
   diveColor.value = accent(w);
   if (depthEl.value) depthEl.value.style.transform = ''; // hand the transform back to the CSS dive
   diving.value = true;
-  setTimeout(() => router.push('/'), 520);
+  setTimeout(() => pushWithoutTransition('/'), 460);
 }
 
 async function onLogout() {
@@ -203,10 +203,11 @@ async function onLogout() {
 /* --- flash + dive --- */
 .flash {
   position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0;
-  background: radial-gradient(circle at 50% 42%, var(--dive), transparent 68%);
-  transition: opacity .6s ease-in;
+  background: radial-gradient(circle at 50% 42%, var(--dive), transparent 72%);
+  transition: opacity .46s ease-in;
 }
-.portal.diving .flash { opacity: .9; }
+/* A warm bloom, not a solid wall — so the cut to the dashboard reads as arrival. */
+.portal.diving .flash { opacity: .6; }
 .portal.diving .depth { transform: translateZ(700px) scale(1.4); opacity: 0; transition: transform .52s cubic-bezier(.7,0,.84,0), opacity .52s; }
 /* Stop the ring keyframes during the dive so the GPU only handles the rush. */
 .portal.diving .ring { animation-play-state: paused; }
