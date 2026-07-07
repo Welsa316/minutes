@@ -25,6 +25,8 @@ const routes = [
       { path: 'projects/:id',    name: 'project',     component: () => import('../views/ProjectDetail.vue') },
       { path: 'meetings',        name: 'meetings',    component: () => import('../views/Meetings.vue') },
       { path: 'time',            name: 'time',        component: () => import('../views/Time.vue') },
+      { path: 'invoices',        name: 'invoices',    component: () => import('../views/Invoices.vue') },
+      { path: 'invoices/:id',    name: 'invoice',     component: () => import('../views/InvoiceDetail.vue') },
       { path: 'meetings/new',    name: 'meeting-new', component: () => import('../views/MeetingNew.vue') },
       { path: 'meetings/:id',    name: 'meeting',     component: () => import('../views/MeetingDetail.vue') },
       {

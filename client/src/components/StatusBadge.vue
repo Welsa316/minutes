@@ -28,12 +28,19 @@ const COLORS = {
     shipped: 'bg-slate-warm/10 text-slate-warm',
     declined: 'bg-slate-warm/10 text-slate-warm',
   },
+  invoice: {
+    draft: 'bg-sand text-ink',
+    sent: 'bg-terracotta/15 text-terracotta',
+    paid: 'bg-[#3F6B4C]/15 text-[#3F6B4C]',
+    overdue: 'bg-red-500/15 text-red-600',
+  },
 };
 
 const OPTIONS = {
   client: ['lead', 'active', 'paused', 'archived'],
   project: ['proposed', 'active', 'on_hold', 'done'],
   feedback: ['new', 'triaged', 'planned', 'shipped', 'declined'],
+  invoice: ['draft', 'sent', 'paid'],
 };
 
 const classes = computed(() => COLORS[props.variant]?.[props.status] || 'bg-sand text-ink');

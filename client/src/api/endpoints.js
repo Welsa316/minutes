@@ -39,6 +39,14 @@ export const timeEntries = {
   stop: (id) => api.put(`/time-entries/${id}/stop`).then((r) => r.data),
 };
 
+export const invoices = {
+  ...crud('/invoices'),
+  addLine: (id, body) => api.post(`/invoices/${id}/lines`, body).then((r) => r.data),
+  updateLine: (lineId, body) => api.put(`/invoices/lines/${lineId}`, body).then((r) => r.data),
+  removeLine: (lineId) => api.delete(`/invoices/lines/${lineId}`),
+  fromTime: (id, rate_cents) => api.post(`/invoices/${id}/from-time`, { rate_cents }).then((r) => r.data),
+};
+
 export const search = (q) =>
   api.get('/search', { params: { q } }).then((r) => r.data);
 

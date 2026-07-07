@@ -98,6 +98,7 @@ export const MODULES = [
   { key: 'clients',  label: 'Clients',  icon: '◉', desc: 'People and companies you work with.' },
   { key: 'projects', label: 'Projects', icon: '▤', desc: 'Track work with status and deadlines.' },
   { key: 'time',     label: 'Time',     icon: '◔', desc: 'Track billable hours by client and project.' },
+  { key: 'invoices', label: 'Invoices', icon: '$', desc: 'Bill clients and pull in tracked time.' },
   { key: 'tags',     label: 'Tags',     icon: '#', desc: 'Cross-link everything with #tags.' },
   { key: 'feedback', label: 'Feedback', icon: '✉', desc: 'Triage product feedback into ideas.' },
   { key: 'roadmap',  label: 'Roadmap',  icon: '◈', desc: 'What to build next, by lane.' },
