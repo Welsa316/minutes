@@ -32,7 +32,7 @@ function ringStyle(i) {
     '--sz': `${620 + (i % 3) * 70}px`,
     '--dur': `${DUR}s`,
     '--delay': `${-(i / RINGS) * DUR}s`,
-    '--clr': i % 2 ? 'rgba(198,93,62,.5)' : 'rgba(15,27,45,.24)',
+    '--clr': i % 2 ? 'rgb(var(--c-terracotta) / 0.5)' : 'rgb(var(--c-ink) / 0.2)',
   };
 }
 
@@ -117,8 +117,8 @@ async function onLogout() {
 <style scoped>
 .portal {
   position: fixed; inset: 0; overflow: hidden;
-  background: radial-gradient(120% 90% at 50% 8%, #FDFBF7 0%, #FBF8F3 44%, #F1E9DC 100%);
-  color: #0F1B2D;
+  background: radial-gradient(120% 90% at 50% 8%, rgb(var(--c-surface)) 0%, rgb(var(--c-warm)) 55%);
+  color: rgb(var(--c-ink));
   perspective: 1000px; perspective-origin: 50% 42%;
   font-family: Inter, system-ui, sans-serif;
 }
@@ -155,42 +155,42 @@ async function onLogout() {
 .brand { display: flex; align-items: center; gap: .55rem; font-weight: 600; letter-spacing: .01em; }
 .mark {
   width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
-  background: #0F1B2D; color: #FBF8F3; font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.05rem;
+  background: #C65D3E; color: #FBF8F3; font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.05rem;
 }
 .signout {
-  background: none; border: 0; cursor: pointer; color: #6B6456; font-size: .85rem;
+  background: none; border: 0; cursor: pointer; color: rgb(var(--c-slate-warm)); font-size: .85rem;
   padding: .4rem .6rem; border-radius: 6px; transition: color .2s, background .2s;
 }
-.signout:hover { color: #0F1B2D; background: rgba(15,27,45,.05); }
+.signout:hover { color: rgb(var(--c-ink)); background: rgb(var(--c-ink) / 0.06); }
 
 .hub { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: 940px; margin: 0 auto; width: 100%; }
 .greet {
   font-family: "IBM Plex Serif", Georgia, serif; font-weight: 500;
   font-size: clamp(2.2rem, 5vw, 3.6rem); line-height: 1; letter-spacing: -.02em; margin: 0 0 1.8rem;
 }
-.label { text-transform: uppercase; letter-spacing: .2em; font-size: .72rem; color: #8A8072; margin: 0 0 1rem; font-weight: 500; }
+.label { text-transform: uppercase; letter-spacing: .2em; font-size: .72rem; color: rgb(var(--c-slate-warm)); margin: 0 0 1rem; font-weight: 500; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1rem; }
 .card {
-  text-align: left; cursor: pointer; background: rgba(255,255,255,.66);
-  border: 1px solid rgba(15,27,45,.1); border-radius: 14px; padding: 1.15rem 1.2rem;
+  text-align: left; cursor: pointer; background: rgb(var(--c-surface) / 0.72);
+  border: 1px solid rgb(var(--c-sand)); border-radius: 14px; padding: 1.15rem 1.2rem;
   display: flex; flex-direction: column; gap: .55rem; backdrop-filter: blur(6px);
   transition: transform .22s cubic-bezier(.2,.8,.2,1), border-color .22s, box-shadow .22s, background .22s;
 }
 .card:hover {
-  transform: translateY(-3px); border-color: var(--accent, #0F1B2D);
-  box-shadow: 0 18px 40px rgba(15,27,45,.12); background: rgba(255,255,255,.9);
+  transform: translateY(-3px); border-color: var(--accent, rgb(var(--c-terracotta)));
+  box-shadow: 0 18px 40px rgba(0,0,0,.22); background: rgb(var(--c-surface) / 0.95);
 }
 .ic {
   width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
-  background: var(--accent, #0F1B2D); color: #FBF8F3; font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.15rem;
+  background: var(--accent, rgb(var(--c-ink))); color: #FBF8F3; font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.15rem;
 }
-.nm { font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.2rem; color: #0F1B2D; line-height: 1.1; }
-.meta { font-size: .78rem; color: #8A8072; }
+.nm { font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.2rem; color: rgb(var(--c-ink)); line-height: 1.1; }
+.meta { font-size: .78rem; color: rgb(var(--c-slate-warm)); }
 
 .card.new { border-style: dashed; background: transparent; }
-.card.new .ic { background: transparent; color: #C65D3E; border: 1.5px dashed rgba(198,93,62,.5); font-size: 1.4rem; }
-.card.new:hover { border-color: #C65D3E; }
+.card.new .ic { background: transparent; color: rgb(var(--c-terracotta)); border: 1.5px dashed rgb(var(--c-terracotta) / 0.5); font-size: 1.4rem; }
+.card.new:hover { border-color: rgb(var(--c-terracotta)); }
 
 /* --- flash + dive --- */
 .flash {

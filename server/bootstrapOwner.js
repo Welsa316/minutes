@@ -6,9 +6,10 @@ import { query } from './db/index.js';
 // so nothing is orphaned and the owner keeps logging in with the same creds.
 // Idempotent — safe to run on every boot.
 export async function bootstrapOwner() {
-  // Store lowercased: register() and login() both normalize email to lowercase,
-  // so the owner's row must match or they'd be locked out after the migration.
-  const adminUser = process.env.ADMIN_USERNAME?.trim().toLowerCase();
+  // The identifier (email column) is lowercased so login is case-insensitive,
+  // but the display name keeps its original case (e.g. "Walid AlHakim").
+  const rawAdmin = process.env.ADMIN_USERNAME?.trim();
+  const adminUser = rawAdmin?.toLowerCase();
   const adminHash = process.env.ADMIN_PASSWORD_HASH;
   if (!adminUser || !adminHash) return; // fresh install with no legacy owner
 
@@ -16,11 +17,13 @@ export async function bootstrapOwner() {
   let ownerId;
   if (existing.rows[0]) {
     ownerId = existing.rows[0].id;
-    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [adminHash, ownerId]);
+    // Keep the password in sync and restore the display name's original case
+    // (an earlier version stored it lowercased).
+    await query('UPDATE users SET password_hash = $1, name = $2 WHERE id = $3', [adminHash, rawAdmin, ownerId]);
   } else {
     ownerId = (await query(
       'INSERT INTO users (email, password_hash, name) VALUES ($1, $2, $3) RETURNING id',
-      [adminUser, adminHash, adminUser],
+      [adminUser, adminHash, rawAdmin],
     )).rows[0].id;
   }
 
