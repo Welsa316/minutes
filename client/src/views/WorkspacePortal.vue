@@ -37,18 +37,23 @@ function ringStyle(i) {
   };
 }
 
-// --- Parallax: tilt the whole tunnel toward the cursor ---
-const tilt = reactive({ x: 0, y: 0 });
-function onMove(e) {
-  tilt.x = (e.clientY / window.innerHeight - 0.5) * -7;
-  tilt.y = (e.clientX / window.innerWidth - 0.5) * 7;
+// --- Parallax: tilt the tunnel toward the cursor. Written straight to the DOM
+// inside a rAF so a fast mouse doesn't trigger a Vue re-render every move (that
+// was the source of the stutter, especially in the Electron shell). ---
+const depthEl = ref(null);
+let px = 0, py = 0, raf = 0;
+function applyTilt() {
+  raf = 0;
+  if (depthEl.value && !diving.value) depthEl.value.style.transform = `rotateX(${py}deg) rotateY(${px}deg)`;
 }
-const depthTransform = computed(() =>
-  diving.value ? {} : { transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)` },
-);
+function onMove(e) {
+  py = (e.clientY / window.innerHeight - 0.5) * -7;
+  px = (e.clientX / window.innerWidth - 0.5) * 7;
+  if (!raf) raf = requestAnimationFrame(applyTilt);
+}
 
-onMounted(() => { if (!reduce) window.addEventListener('pointermove', onMove); });
-onBeforeUnmount(() => window.removeEventListener('pointermove', onMove));
+onMounted(() => { if (!reduce) window.addEventListener('pointermove', onMove, { passive: true }); });
+onBeforeUnmount(() => { window.removeEventListener('pointermove', onMove); if (raf) cancelAnimationFrame(raf); });
 
 const MODULE_LABEL = { notes: 'Notes', meetings: 'Meetings', clients: 'Clients', projects: 'Projects', tags: 'Tags' };
 function metaFor(w) {
@@ -59,11 +64,13 @@ function accent(w) { return w.color ? `#${w.color}` : '#0F1B2D'; }
 
 // --- Dive into a workspace: set it active, rush the tunnel forward, then land ---
 function enter(w) {
+  if (diving.value) return; // guard against a second click mid-dive
   ws.setActive(w.id);
   if (reduce) { router.push('/'); return; }
   diveColor.value = accent(w);
+  if (depthEl.value) depthEl.value.style.transform = ''; // hand the transform back to the CSS dive
   diving.value = true;
-  setTimeout(() => router.push('/'), 620);
+  setTimeout(() => router.push('/'), 520);
 }
 
 async function onLogout() {
@@ -74,7 +81,7 @@ async function onLogout() {
 
 <template>
   <div class="portal" :class="{ diving, reduce }" :style="{ '--dive': diveColor }">
-    <div class="depth" aria-hidden="true" :style="depthTransform">
+    <div class="depth" aria-hidden="true" ref="depthEl">
       <span v-for="i in RINGS" :key="i" class="ring" :style="ringStyle(i)" />
     </div>
     <div class="flash" aria-hidden="true" />
@@ -200,8 +207,10 @@ async function onLogout() {
   transition: opacity .6s ease-in;
 }
 .portal.diving .flash { opacity: .9; }
-.portal.diving .depth { transform: translateZ(720px) scale(1.5); opacity: 0; transition: transform .62s cubic-bezier(.7,0,.84,0), opacity .62s; }
-.portal.diving .content { opacity: 0; transform: scale(1.05); }
+.portal.diving .depth { transform: translateZ(700px) scale(1.4); opacity: 0; transition: transform .52s cubic-bezier(.7,0,.84,0), opacity .52s; }
+/* Stop the ring keyframes during the dive so the GPU only handles the rush. */
+.portal.diving .ring { animation-play-state: paused; }
+.portal.diving .content { opacity: 0; transform: scale(1.04); transition: opacity .4s ease-in, transform .4s ease-in; }
 
 /* --- reduced motion: a calm static nest of rings, no dive --- */
 .portal.reduce .ring { animation: none; opacity: .3; transform: translateZ(calc(var(--i) * -170px)); }
