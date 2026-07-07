@@ -224,6 +224,7 @@ router.put('/steps/:stepId', async (req, res, next) => {
     const vals = [];
     const add = (col, val) => { sets.push(`${col} = $${vals.push(val)}`); };
     if ('label' in body) add('label', String(body.label || ''));
+    if ('note' in body) add('note', body.note || null);
     if ('done' in body) add('done', body.done === true);
     if ('sort_order' in body) add('sort_order', Math.round(Number(body.sort_order) || 0));
     if (!sets.length) return res.status(400).json({ error: 'no fields' });
