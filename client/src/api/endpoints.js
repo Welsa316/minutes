@@ -26,11 +26,17 @@ export const actionItems = {
 export const feedback = crud('/feedback');
 export const ideas = {
   ...crud('/ideas'),
-  steps: (id) => api.get(`/ideas/${id}/steps`).then((r) => r.data),
-  addStep: (id, label) => api.post(`/ideas/${id}/steps`, { label }).then((r) => r.data),
+  // Phases: the ordered stages inside an idea, each with a brief + nested steps.
+  phases: (id) => api.get(`/ideas/${id}/phases`).then((r) => r.data),
+  addPhase: (id, title) => api.post(`/ideas/${id}/phases`, { title }).then((r) => r.data),
+  updatePhase: (phaseId, body) => api.put(`/ideas/phases/${phaseId}`, body).then((r) => r.data),
+  removePhase: (phaseId) => api.delete(`/ideas/phases/${phaseId}`),
+  reorderPhases: (id, order) => api.put(`/ideas/${id}/phases/reorder`, { order }).then((r) => r.data),
+  // Steps live inside a phase.
+  addStep: (phaseId, label) => api.post(`/ideas/phases/${phaseId}/steps`, { label }).then((r) => r.data),
   updateStep: (stepId, body) => api.put(`/ideas/steps/${stepId}`, body).then((r) => r.data),
   removeStep: (stepId) => api.delete(`/ideas/steps/${stepId}`),
-  reorderSteps: (id, order) => api.put(`/ideas/${id}/steps/reorder`, { order }).then((r) => r.data),
+  reorderSteps: (phaseId, order) => api.put(`/ideas/phases/${phaseId}/steps/reorder`, { order }).then((r) => r.data),
 };
 export const metrics = {
   list: () => api.get('/metrics').then((r) => r.data),

@@ -11,9 +11,13 @@ const items = ref([]);
 const loading = ref(true);
 const selectedId = ref(null);
 const newTitle = ref('');
-const newStep = ref('');
-const steps = ref([]);
 const trackEl = ref(null);
+
+// The selected idea's plan: ordered phases, each with a brief + nested steps.
+const phases = ref([]);
+const openPhases = ref({});
+const newPhase = ref('');
+const newStepText = ref({});
 
 // The pipeline: ideas flow left → right through these stages.
 const STAGES = [
@@ -46,7 +50,22 @@ const avgProgress = computed(() => {
   return Math.round(items.value.reduce((s, i) => s + progressOf(i), 0) / items.value.length);
 });
 
-const clamp = (n) => Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
+// A phase is "done" once it has steps and they're all checked; the first phase
+// that isn't done is the one you're on now.
+const phaseFull = (p) => p.steps.length > 0 && p.steps.every((s) => s.done);
+const activePhaseId = computed(() => (phases.value.find((p) => !phaseFull(p)) || {}).id ?? null);
+function phaseState(p) {
+  if (phaseFull(p)) return 'done';
+  if (p.id === activePhaseId.value) return 'active';
+  return 'upcoming';
+}
+const PHASE_LABEL = { done: 'Done', active: 'In progress', upcoming: 'Upcoming' };
+const stepStats = computed(() => {
+  const total = phases.value.reduce((s, p) => s + p.steps.length, 0);
+  const done = phases.value.reduce((s, p) => s + p.steps.filter((x) => x.done).length, 0);
+  return { total, done, pct: total ? Math.round((done / total) * 100) : 0 };
+});
+const phasesDone = computed(() => phases.value.filter(phaseFull).length);
 
 async function load() {
   loading.value = true;
@@ -58,7 +77,7 @@ async function addIdea() {
   const title = newTitle.value.trim();
   if (!title) return;
   const row = await api.create({ title, lane: 'considering' });
-  row.demand = 0; row.progress = 0;
+  row.demand = 0; row.progress = 0; row.step_total = 0; row.step_done = 0;
   items.value.push(row);
   newTitle.value = '';
   selectedId.value = row.id;
@@ -72,7 +91,6 @@ async function patch(idea, body) {
   try { await api.update(idea.id, body); }
   catch { Object.assign(idea, prev); toast.error('Save failed'); }
 }
-function setProgress(idea, v) { patch(idea, { progress: clamp(v) }); }
 function setStage(idea, lane) { patch(idea, { lane }); }
 function setEffort(idea, effort) { patch(idea, { effort: effort || null }); }
 
@@ -109,38 +127,85 @@ function onMove(e) {
 function onUp() { drag.down = false; }
 function onNodeClick(idea) { if (drag.moved) { drag.moved = false; return; } selectedId.value = idea.id; }
 
-// --- steps: the ordered plan inside the selected idea ---
+// --- the plan: phases + their steps ---
 // A monotonic token so a slow response for a previously-selected idea can't
-// overwrite the checklist of the one now selected.
-let stepsReq = 0;
-async function loadSteps(id) {
-  const req = ++stepsReq;
-  steps.value = [];
+// overwrite the plan of the one now selected.
+let phasesReq = 0;
+async function loadPhases(id) {
+  const req = ++phasesReq;
+  phases.value = [];
+  openPhases.value = {};
   if (!id) return;
-  try { const rows = await api.steps(id); if (req === stepsReq) steps.value = rows; }
-  catch { if (req === stepsReq) steps.value = []; }
+  try {
+    const rows = await api.phases(id);
+    if (req !== phasesReq) return;
+    phases.value = rows;
+    // Reconcile the cached node counts with the authoritative phase totals.
+    const idea = selected.value;
+    if (idea && idea.id === id) {
+      idea.step_total = rows.reduce((s, p) => s + p.steps.length, 0);
+      idea.step_done = rows.reduce((s, p) => s + p.steps.filter((x) => x.done).length, 0);
+    }
+    // Open the phase you're on (or the first) by default.
+    const act = rows.find((p) => !phaseFull(p)) || rows[0];
+    if (act) openPhases.value = { [act.id]: true };
+  } catch { if (req === phasesReq) phases.value = []; }
 }
-watch(selectedId, (id) => loadSteps(id));
+watch(selectedId, (id) => loadPhases(id));
 
 function bumpCounts(idea, dTotal, dDone) {
   if (!idea) return;
   idea.step_total = Number(idea.step_total || 0) + dTotal;
   idea.step_done = Number(idea.step_done || 0) + dDone;
 }
-// Each handler captures its idea BEFORE the await, so switching nodes mid-request
-// updates the right idea's counts and never lands a step on the wrong checklist.
-async function addStep() {
-  const label = newStep.value.trim();
+function togglePhase(p) { openPhases.value[p.id] = !openPhases.value[p.id]; }
+
+// Each handler captures its idea BEFORE the await, so switching ideas mid-request
+// updates the right node's counts and never lands work on the wrong plan.
+async function addPhase() {
+  const title = newPhase.value.trim();
+  const idea = selected.value;
+  if (!title || !idea) return;
+  newPhase.value = '';
+  try {
+    const p = await api.addPhase(idea.id, title);
+    if (selected.value === idea) { phases.value.push(p); openPhases.value[p.id] = true; }
+  } catch { toast.error('Couldn’t add phase'); }
+}
+async function editPhase(p, body) {
+  const prev = { title: p.title, note: p.note };
+  Object.assign(p, body);
+  try { await api.updatePhase(p.id, body); }
+  catch { Object.assign(p, prev); toast.error('Save failed'); }
+}
+async function removePhase(p) {
+  const idea = selected.value;
+  const i = phases.value.indexOf(p);
+  if (i > -1) phases.value.splice(i, 1);
+  const t = p.steps.length, d = p.steps.filter((s) => s.done).length;
+  bumpCounts(idea, -t, -d);
+  try { await api.removePhase(p.id); toast.show('Phase removed', { kind: 'info', ttl: 4000 }); }
+  catch { if (i > -1) phases.value.splice(i, 0, p); bumpCounts(idea, t, d); toast.error('Delete failed'); }
+}
+async function reorderPhases() {
+  const idea = selected.value;
+  if (!idea) return;
+  try { await api.reorderPhases(idea.id, phases.value.map((p) => p.id)); }
+  catch { toast.error('Reorder failed'); }
+}
+
+async function addStep(p) {
+  const label = (newStepText.value[p.id] || '').trim();
   const idea = selected.value;
   if (!label || !idea) return;
-  newStep.value = '';
+  newStepText.value[p.id] = '';
   try {
-    const s = await api.addStep(idea.id, label);
+    const s = await api.addStep(p.id, label);
     bumpCounts(idea, 1, 0);
-    if (selected.value === idea) steps.value.push(s);
+    if (selected.value === idea) p.steps.push(s);
   } catch { toast.error('Couldn’t add step'); }
 }
-async function toggleStep(s) {
+async function toggleStep(p, s) {
   const idea = selected.value;
   s.done = !s.done;
   bumpCounts(idea, 0, s.done ? 1 : -1);
@@ -152,18 +217,16 @@ async function editStep(s, label) {
   try { await api.updateStep(s.id, { label }); }
   catch { s.label = prev; toast.error('Save failed'); }
 }
-async function removeStep(s) {
+async function removeStep(p, s) {
   const idea = selected.value;
-  const i = steps.value.indexOf(s);
-  if (i > -1) steps.value.splice(i, 1);
+  const i = p.steps.indexOf(s);
+  if (i > -1) p.steps.splice(i, 1);
   bumpCounts(idea, -1, s.done ? -1 : 0);
   try { await api.removeStep(s.id); }
-  catch { bumpCounts(idea, 1, s.done ? 1 : 0); toast.error('Delete failed'); if (selected.value === idea) loadSteps(idea.id); }
+  catch { if (i > -1) p.steps.splice(i, 0, s); bumpCounts(idea, 1, s.done ? 1 : 0); toast.error('Delete failed'); }
 }
-async function reorderSteps() {
-  const idea = selected.value;
-  if (!idea) return;
-  try { await api.reorderSteps(idea.id, steps.value.map((s) => s.id)); }
+async function reorderSteps(p) {
+  try { await api.reorderSteps(p.id, p.steps.map((s) => s.id)); }
   catch { toast.error('Reorder failed'); }
 }
 
@@ -224,13 +287,13 @@ onMounted(load);
         </div>
       </section>
 
-      <!-- Drill-down -->
+      <!-- Drill-down: the plan -->
       <section class="drill">
         <div class="drill-rule"><span /><em>Deep dive</em><span /></div>
 
         <div v-if="!selected" class="drill-empty">
           <div class="drill-empty-ic">◇</div>
-          <p>Select an idea to open its plan — add the steps, check them off, and move it down the pipeline.</p>
+          <p>Select an idea to open its plan — break it into phases, give each a brief, and work the steps down.</p>
         </div>
 
         <div v-else class="drill-card">
@@ -246,39 +309,76 @@ onMounted(load);
           <textarea
             :value="selected.note || ''"
             @change="patch(selected, { note: $event.target.value || null })"
-            rows="4"
-            placeholder="What is this and why does it matter?"
+            rows="2"
+            placeholder="The pitch — what is this and why now?"
             class="drill-note"
           />
 
-          <!-- steps: the plan -->
-          <div class="mt-4">
-            <div class="flex items-center justify-between mb-2">
-              <span class="meta-label">Steps</span>
-              <span v-if="steps.length" class="text-xs tabular-nums text-ink font-medium">{{ selected.step_done || 0 }}/{{ steps.length }} · {{ progressOf(selected) }}%</span>
-            </div>
-            <div v-if="steps.length" class="bar mb-3"><span class="fill" :style="{ width: progressOf(selected) + '%' }" /></div>
-
-            <VueDraggable v-model="steps" handle=".sgrip" animation="150" class="space-y-1" @end="reorderSteps">
-              <div v-for="s in steps" :key="s.id" class="step">
-                <span class="sgrip" title="Drag to reorder">⠿</span>
-                <button type="button" class="scheck" :class="{ on: s.done }" @click="toggleStep(s)" :aria-label="s.done ? 'Mark not done' : 'Mark done'">
-                  <svg v-if="s.done" viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                </button>
-                <input :value="s.label" @change="editStep(s, $event.target.value)" :class="['slabel', { done: s.done }]" />
-                <button type="button" class="sdel" @click="removeStep(s)" title="Remove step">✕</button>
-              </div>
-            </VueDraggable>
-
-            <form @submit.prevent="addStep" class="step">
-              <span class="sgrip" style="visibility:hidden">⠿</span>
-              <span class="scheck ghost">＋</span>
-              <input v-model="newStep" placeholder="Add a step…" class="slabel" />
-            </form>
+          <!-- overall progress -->
+          <div class="plan-head">
+            <span class="meta-label">Plan</span>
+            <span v-if="stepStats.total" class="text-xs tabular-nums text-slate-warm">
+              {{ phasesDone }}/{{ phases.length }} phases · {{ stepStats.done }}/{{ stepStats.total }} steps · <span class="text-ink font-medium">{{ stepStats.pct }}%</span>
+            </span>
           </div>
+          <div v-if="stepStats.total" class="bar mb-3"><span class="fill" :style="{ width: stepStats.pct + '%' }" /></div>
+
+          <!-- the spine -->
+          <VueDraggable v-model="phases" handle=".pgrip" animation="160" class="spine" @end="reorderPhases">
+            <div v-for="(p, pi) in phases" :key="p.id" class="phase" :class="`state-${phaseState(p)}`">
+              <div class="phase-head" @click="togglePhase(p)">
+                <span class="pnode"><svg v-if="phaseState(p) === 'done'" viewBox="0 0 24 24" class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg></span>
+                <span class="pidx">Phase {{ pi + 1 }}</span>
+                <input
+                  :value="p.title"
+                  @change="editPhase(p, { title: $event.target.value })"
+                  @click.stop @mousedown.stop
+                  class="ptitle"
+                  placeholder="Name this phase…"
+                />
+                <span class="pcount tabular-nums" v-if="p.steps.length">{{ p.steps.filter((s) => s.done).length }}/{{ p.steps.length }}</span>
+                <span class="ppill" :class="phaseState(p)">{{ PHASE_LABEL[phaseState(p)] }}</span>
+                <button type="button" class="pdel" @click.stop="removePhase(p)" title="Remove phase">✕</button>
+                <span class="pgrip" @click.stop title="Drag to reorder">⠿</span>
+                <span class="pchev" :class="{ open: openPhases[p.id] }" aria-hidden="true">▸</span>
+              </div>
+
+              <div v-show="openPhases[p.id]" class="phase-body">
+                <textarea
+                  :value="p.note || ''"
+                  @change="editPhase(p, { note: $event.target.value || null })"
+                  rows="2"
+                  placeholder="Brief — the why and the how. Who, what, by when?"
+                  class="pnote"
+                />
+
+                <VueDraggable v-model="p.steps" handle=".sgrip" animation="150" class="space-y-1 mt-2" @end="reorderSteps(p)">
+                  <div v-for="s in p.steps" :key="s.id" class="step">
+                    <span class="sgrip" title="Drag to reorder">⠿</span>
+                    <button type="button" class="scheck" :class="{ on: s.done }" @click="toggleStep(p, s)" :aria-label="s.done ? 'Mark not done' : 'Mark done'">
+                      <svg v-if="s.done" viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                    </button>
+                    <input :value="s.label" @change="editStep(s, $event.target.value)" :class="['slabel', { done: s.done }]" />
+                    <button type="button" class="sdel" @click="removeStep(p, s)" title="Remove step">✕</button>
+                  </div>
+                </VueDraggable>
+
+                <form @submit.prevent="addStep(p)" class="step">
+                  <span class="sgrip" style="visibility:hidden">⠿</span>
+                  <span class="scheck ghost">＋</span>
+                  <input v-model="newStepText[p.id]" placeholder="Add a step…" class="slabel" />
+                </form>
+              </div>
+            </div>
+          </VueDraggable>
+
+          <form @submit.prevent="addPhase" class="add-phase">
+            <span class="pnode ghost">＋</span>
+            <input v-model="newPhase" placeholder="Add a phase — Now, Next, Launch…" />
+          </form>
 
           <!-- meta -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
             <label class="meta-box">
               <span class="meta-label">Stage</span>
               <select :value="selected.lane" @change="setStage(selected, $event.target.value)" class="meta-select">
@@ -383,7 +483,7 @@ onMounted(load);
 .drill-empty p { font-size: 0.9rem; }
 
 .drill-card {
-  max-width: 40rem; margin: 0 auto; padding: 1.5rem;
+  max-width: 42rem; margin: 0 auto; padding: 1.5rem;
   background: rgb(var(--c-surface) / 0.7); backdrop-filter: blur(16px);
   border: 1px solid rgb(var(--c-sand)); border-radius: 1rem;
 }
@@ -396,7 +496,44 @@ onMounted(load);
 .drill-note { width: 100%; background: transparent; border: 1px solid rgb(var(--c-sand)); border-radius: 0.6rem; padding: 0.6rem 0.75rem; font-size: 0.9rem; color: rgb(var(--c-ink)); resize: none; }
 .drill-note:focus { outline: none; box-shadow: 0 0 0 2px rgb(var(--c-terracotta) / 0.4); }
 
-.range { width: 100%; accent-color: rgb(var(--c-terracotta)); cursor: pointer; }
+.plan-head { display: flex; align-items: baseline; justify-content: space-between; margin: 1.1rem 0 0.5rem; }
+
+/* --- the spine --- */
+.spine { position: relative; }
+.spine::before { content: ''; position: absolute; left: 8px; top: 0.9rem; bottom: 0.9rem; width: 2px; background: rgb(var(--c-sand)); border-radius: 2px; }
+.phase { position: relative; }
+
+.phase-head { display: flex; align-items: center; gap: 0.55rem; padding: 0.5rem 0; cursor: pointer; user-select: none; }
+.pnode {
+  width: 18px; height: 18px; flex: 0 0 auto; border-radius: 50%; z-index: 1;
+  background: rgb(var(--c-warm)); border: 2px solid rgb(var(--c-sand));
+  display: grid; place-items: center; color: #fff;
+}
+.state-active > .phase-head .pnode { border-color: rgb(var(--c-terracotta)); border-width: 3px; }
+.state-done > .phase-head .pnode { background: #3F6B4C; border-color: #3F6B4C; }
+.pidx { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgb(var(--c-slate-warm) / 0.8); white-space: nowrap; }
+.ptitle { flex: 1; min-width: 0; font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1.02rem; color: rgb(var(--c-ink)); background: transparent; border: 0; padding: 0.15rem 0.25rem; border-radius: 0.3rem; }
+.ptitle:focus { outline: none; background: rgb(var(--c-sand) / 0.4); }
+.state-upcoming > .phase-head .ptitle { color: rgb(var(--c-ink) / 0.65); }
+.pcount { font-size: 0.72rem; color: rgb(var(--c-slate-warm)); }
+.ppill { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.15rem 0.45rem; border-radius: 999px; white-space: nowrap; background: rgb(var(--c-sand)); color: rgb(var(--c-slate-warm)); }
+.ppill.active { background: rgb(var(--c-terracotta) / 0.15); color: rgb(var(--c-terracotta)); }
+.ppill.done { background: rgba(63, 107, 76, 0.15); color: #3F6B4C; }
+.pdel { color: rgb(var(--c-slate-warm) / 0.55); font-size: 0.78rem; opacity: 0; transition: opacity .15s; }
+.phase-head:hover .pdel { opacity: 1; }
+.pdel:hover { color: rgb(var(--c-terracotta)); }
+.pgrip { cursor: grab; color: rgb(var(--c-slate-warm) / 0.45); font-size: 0.8rem; line-height: 1; opacity: 0; transition: opacity .15s; }
+.phase-head:hover .pgrip { opacity: 1; }
+.pgrip:active { cursor: grabbing; }
+.pchev { color: rgb(var(--c-slate-warm)); font-size: 0.7rem; transition: transform .18s; }
+.pchev.open { transform: rotate(90deg); }
+
+.phase-body { padding: 0.25rem 0 0.75rem 1.6rem; margin-left: 8px; border-left: 2px solid transparent; }
+.pnote {
+  width: 100%; background: rgb(var(--c-sand) / 0.25); border: 1px solid rgb(var(--c-sand)); border-radius: 0.55rem;
+  padding: 0.55rem 0.7rem; font-size: 0.85rem; line-height: 1.5; color: rgb(var(--c-slate-warm)); resize: none;
+}
+.pnote:focus { outline: none; color: rgb(var(--c-ink)); box-shadow: 0 0 0 2px rgb(var(--c-terracotta) / 0.35); }
 
 /* steps checklist */
 .step { display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0; }
@@ -418,6 +555,13 @@ onMounted(load);
 .sdel { color: rgb(var(--c-slate-warm) / 0.6); font-size: 0.8rem; opacity: 0; transition: opacity .15s; }
 .step:hover .sdel { opacity: 1; }
 .sdel:hover { color: rgb(var(--c-terracotta)); }
+
+.add-phase { display: flex; align-items: center; gap: 0.55rem; padding: 0.5rem 0; }
+.add-phase .pnode.ghost { border-style: dashed; background: transparent; color: rgb(var(--c-slate-warm)); font-size: 0.8rem; }
+.add-phase input { flex: 1; background: transparent; border: 0; font-size: 0.92rem; color: rgb(var(--c-ink)); font-family: 'IBM Plex Serif', Georgia, serif; }
+.add-phase input::placeholder { color: rgb(var(--c-slate-warm) / 0.6); font-family: Inter, sans-serif; }
+.add-phase input:focus { outline: none; }
+
 .meta-box { display: flex; flex-direction: column; gap: 0.35rem; background: rgb(var(--c-sand) / 0.35); border-radius: 0.6rem; padding: 0.6rem 0.75rem; }
 .meta-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgb(var(--c-slate-warm)); }
 .meta-select { background: transparent; border: 0; font-size: 0.9rem; color: rgb(var(--c-ink)); }
