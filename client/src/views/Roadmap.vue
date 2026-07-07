@@ -238,6 +238,11 @@ async function editStep(s, label) {
   try { await api.updateStep(s.id, { label }); }
   catch { s.label = prev; toast.error('Save failed'); }
 }
+async function editStepNote(s, note) {
+  const prev = s.note; s.note = note;
+  try { await api.updateStep(s.id, { note }); }
+  catch { s.note = prev; toast.error('Save failed'); }
+}
 async function removeStep(p, s) {
   const idea = selected.value;
   const i = p.steps.indexOf(s);
@@ -317,16 +322,18 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
       <Transition name="focus">
         <div v-if="selected" class="focus" role="dialog" aria-modal="true">
           <header class="focus-head">
-            <button class="fh-close" @click="close" aria-label="Close">✕</button>
-            <div class="fh-title-wrap">
-              <input
-                class="fh-title"
-                :value="selected.title"
-                @change="patch(selected, { title: $event.target.value.trim() || selected.title })"
-              />
-              <div class="fh-sub">
-                <span :class="['drill-badge', `tone-${stageOf(selected).tone}`]">{{ stageOf(selected).label }}</span>
-                <span class="tabular-nums">{{ phasesDone }}/{{ phases.length }} phases · {{ stepStats.done }}/{{ stepStats.total }} steps · {{ stepStats.pct }}%</span>
+            <div class="fh-inner">
+              <button class="fh-close" @click="close" aria-label="Close">✕</button>
+              <div class="fh-title-wrap">
+                <input
+                  class="fh-title"
+                  :value="selected.title"
+                  @change="patch(selected, { title: $event.target.value.trim() || selected.title })"
+                />
+                <div class="fh-sub">
+                  <span :class="['drill-badge', `tone-${stageOf(selected).tone}`]">{{ stageOf(selected).label }}</span>
+                  <span class="tabular-nums">{{ phasesDone }}/{{ phases.length }} phases · {{ stepStats.done }}/{{ stepStats.total }} steps · {{ stepStats.pct }}%</span>
+                </div>
               </div>
             </div>
             <div class="fh-bar"><span class="fill" :style="{ width: stepStats.pct + '%' }" /></div>
@@ -398,16 +405,25 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 
                         <VueDraggable v-model="p.steps" handle=".sgrip" animation="150" class="steps" @end="reorderSteps(p)">
                           <div v-for="s in p.steps" :key="s.id" class="step">
-                            <span class="sgrip" title="Drag to reorder">⠿</span>
-                            <button type="button" class="scheck" :class="{ on: s.done }" @click="toggleStep(p, s)" :aria-label="s.done ? 'Mark not done' : 'Mark done'">
-                              <svg v-if="s.done" viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                            </button>
-                            <input :value="s.label" @change="editStep(s, $event.target.value)" :class="['slabel', { done: s.done }]" />
-                            <button type="button" class="sdel" @click="removeStep(p, s)" title="Remove step">✕</button>
+                            <div class="step-row">
+                              <span class="sgrip" title="Drag to reorder">⠿</span>
+                              <button type="button" class="scheck" :class="{ on: s.done }" @click="toggleStep(p, s)" :aria-label="s.done ? 'Mark not done' : 'Mark done'">
+                                <svg v-if="s.done" viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                              </button>
+                              <input :value="s.label" @change="editStep(s, $event.target.value)" :class="['slabel', { done: s.done }]" />
+                              <button type="button" class="sdel" @click="removeStep(p, s)" title="Remove step">✕</button>
+                            </div>
+                            <textarea
+                              :value="s.note || ''"
+                              @change="editStepNote(s, $event.target.value || null)"
+                              class="snote"
+                              rows="1"
+                              placeholder="Add detail — what exactly, and how you’ll know it’s done"
+                            />
                           </div>
                         </VueDraggable>
 
-                        <form @submit.prevent="addStep(p)" class="step">
+                        <form @submit.prevent="addStep(p)" class="step-row step-add">
                           <span class="sgrip" style="visibility:hidden">⠿</span>
                           <span class="scheck ghost">＋</span>
                           <input v-model="newStepText[p.id]" placeholder="Add a step…" class="slabel" />
@@ -511,9 +527,10 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
   background: rgb(var(--c-warm)); overflow: hidden;
 }
 .focus-head {
-  flex-shrink: 0; position: relative; display: flex; align-items: flex-start; gap: 1rem;
+  flex-shrink: 0; position: relative;
   padding: 1.5rem 2rem 1rem; border-bottom: 1px solid rgb(var(--c-sand));
 }
+.fh-inner { display: flex; align-items: flex-start; gap: 1rem; max-width: 84rem; margin: 0 auto; width: 100%; }
 .fh-close {
   width: 2.25rem; height: 2.25rem; flex-shrink: 0; border-radius: 0.6rem; margin-top: 0.15rem;
   color: rgb(var(--c-slate-warm)); font-size: 1rem; border: 1px solid rgb(var(--c-sand));
@@ -527,7 +544,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 .fh-bar { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: rgb(var(--c-sand)); }
 .fh-bar .fill { background: rgb(var(--c-terracotta)); }
 
-.focus-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 20rem 1fr; }
+.focus-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 20rem 1fr; max-width: 84rem; margin: 0 auto; width: 100%; }
 
 /* left rail */
 .focus-nav { overflow-y: auto; padding: 1.5rem 1.25rem; border-right: 1px solid rgb(var(--c-sand)); }
@@ -566,12 +583,12 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 .ppill.done { background: rgba(63, 107, 76, 0.15); color: #3F6B4C; }
 
 /* right timeline */
-.focus-detail { overflow-y: auto; padding: 1.75rem 2rem 3rem; }
-.tline { position: relative; max-width: 46rem; }
+.focus-detail { overflow-y: auto; padding: 2rem 2.5rem 4rem; }
+.tline { position: relative; max-width: 54rem; }
 .tline::before { content: ''; position: absolute; left: 7px; top: 0.6rem; bottom: 0.6rem; width: 2px; background: rgb(var(--c-sand)); border-radius: 2px; }
 .tline-empty { color: rgb(var(--c-slate-warm)); font-size: 0.9rem; padding: 1rem 0 1rem 2rem; }
 
-.titem { position: relative; display: flex; gap: 1rem; padding-bottom: 0.4rem; }
+.titem { position: relative; display: flex; gap: 1rem; padding-bottom: 1.4rem; }
 .tgutter { flex: 0 0 16px; display: flex; justify-content: center; padding-top: 0.55rem; }
 .tdot { width: 16px; height: 16px; border-radius: 50%; background: rgb(var(--c-warm)); border: 2px solid rgb(var(--c-sand)); z-index: 1; transition: border-color .25s, background .25s, box-shadow .25s; }
 .state-done .tdot { background: #3F6B4C; border-color: #3F6B4C; }
@@ -581,7 +598,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 .titem-main { flex: 1; min-width: 0; }
 .titem-head { width: 100%; display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0; text-align: left; cursor: pointer; }
 .titem-n { font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1.05rem; color: rgb(var(--c-slate-warm)); width: 1.1rem; flex-shrink: 0; }
-.titem-title { flex: 1; min-width: 0; font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1.15rem; line-height: 1.25; color: rgb(var(--c-ink)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.titem-title { flex: 1; min-width: 0; font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1.25rem; line-height: 1.25; color: rgb(var(--c-ink)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .state-upcoming .titem-title, .state-upcoming .titem-n { color: rgb(var(--c-ink) / 0.55); }
 .titem-count { font-size: 0.72rem; color: rgb(var(--c-slate-warm)); }
 .titem-chev { color: rgb(var(--c-slate-warm)); font-size: 0.7rem; transition: transform .28s cubic-bezier(.4, 0, .2, 1); }
@@ -592,13 +609,25 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 .titem.open .titem-collapse { grid-template-rows: 1fr; }
 .titem-inner { overflow: hidden; opacity: 0; transform: translateY(-4px); transition: opacity .28s ease .04s, transform .28s ease .04s; }
 .titem.open .titem-inner { opacity: 1; transform: none; }
-.titem-inner > * { margin-top: 0.5rem; }
+.titem-inner > * { margin-top: 0.75rem; }
 
 .pnote { width: 100%; background: rgb(var(--c-sand) / 0.25); border: 1px solid rgb(var(--c-sand)); border-radius: 0.6rem; padding: 0.6rem 0.75rem; font-size: 0.88rem; line-height: 1.55; color: rgb(var(--c-slate-warm)); resize: none; }
 .pnote:focus { outline: none; color: rgb(var(--c-ink)); box-shadow: 0 0 0 2px rgb(var(--c-terracotta) / 0.35); }
 
-.steps { display: flex; flex-direction: column; gap: 0.1rem; }
-.step { display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0; }
+.steps { display: flex; flex-direction: column; gap: 0.55rem; }
+.step { padding: 0.1rem 0; }
+.step-row { display: flex; align-items: center; gap: 0.5rem; }
+.step-add { padding-top: 0.5rem; }
+.snote {
+  display: block; width: calc(100% - 2.45rem); margin: 0.15rem 0 0 2.45rem;
+  background: transparent; border: 0; resize: none; font-family: Inter, sans-serif;
+  font-size: 0.83rem; line-height: 1.55; color: rgb(var(--c-slate-warm));
+  field-sizing: content; min-height: 1.4rem;
+}
+.snote::placeholder { color: rgb(var(--c-slate-warm) / 0.45); }
+.snote:focus { outline: none; color: rgb(var(--c-ink)); }
+/* Empty detail stays hidden until you hover/focus the step — filled detail always shows. */
+.step:not(:hover):not(:focus-within) .snote:placeholder-shown { display: none; }
 .titem.open .steps .step { animation: stepIn .3s ease both; }
 .titem.open .steps .step:nth-child(2) { animation-delay: .03s; }
 .titem.open .steps .step:nth-child(3) { animation-delay: .06s; }
@@ -617,7 +646,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 .step:hover .sdel { opacity: 1; }
 .sdel:hover { color: rgb(var(--c-terracotta)); }
 
-.focus-foot { max-width: 46rem; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid rgb(var(--c-sand)); }
+.focus-foot { max-width: 54rem; margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid rgb(var(--c-sand)); }
 .meta-box { display: flex; flex-direction: column; gap: 0.35rem; background: rgb(var(--c-sand) / 0.35); border-radius: 0.6rem; padding: 0.6rem 0.75rem; }
 .meta-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgb(var(--c-slate-warm)); }
 .meta-select { background: transparent; border: 0; font-size: 0.9rem; color: rgb(var(--c-ink)); }
