@@ -23,6 +23,44 @@ const greeting = computed(() => {
   return name ? `${part}, ${name}` : part;
 });
 
+// --- Wordmark: type "Minutes" out letter by letter on load ---
+const brandLetters = 'Minutes'.split('');
+
+// --- Live clock + date ---
+const now = ref(new Date());
+let clockTimer = 0;
+const timeStr = computed(() => now.value.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+const dateStr = computed(() => now.value.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }));
+
+// --- Weather: coarse IP geolocation → Open-Meteo. No API key, cached 30 min, and
+// entirely optional — if anything fails (offline, blocked) the chip just stays hidden. ---
+const weather = ref(null);
+const WEATHER_CACHE = 'minutes:weather';
+const WX_ICON = { 0:'☀', 1:'🌤', 2:'⛅', 3:'☁', 45:'🌫', 48:'🌫', 51:'🌦', 53:'🌦', 55:'🌧', 56:'🌧', 57:'🌧', 61:'🌦', 63:'🌧', 65:'🌧', 66:'🌧', 67:'🌧', 71:'🌨', 73:'🌨', 75:'❄️', 77:'🌨', 80:'🌦', 81:'🌧', 82:'⛈', 85:'🌨', 86:'🌨', 95:'⛈', 96:'⛈', 99:'⛈' };
+
+async function loadWeather() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(WEATHER_CACHE) || 'null');
+    if (cached && Date.now() - cached.ts < 30 * 60 * 1000) { weather.value = cached.data; return; }
+  } catch { /* ignore bad cache */ }
+  try {
+    const geo = await fetch('https://ipapi.co/json/').then((r) => r.json());
+    if (!geo?.latitude) return;
+    const unit = geo.country_code === 'US' ? 'fahrenheit' : 'celsius';
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&current=temperature_2m,weather_code&temperature_unit=${unit}`;
+    const wx = await fetch(url).then((r) => r.json());
+    if (!wx?.current) return;
+    const data = {
+      temp: Math.round(wx.current.temperature_2m),
+      unit: unit === 'fahrenheit' ? '°' : '°',
+      icon: WX_ICON[wx.current.weather_code] || '·',
+      city: geo.city || '',
+    };
+    weather.value = data;
+    localStorage.setItem(WEATHER_CACHE, JSON.stringify({ ts: Date.now(), data }));
+  } catch { /* offline / blocked — leave weather hidden */ }
+}
+
 // --- The depth tunnel: concentric rings staggered evenly through Z ---
 const RINGS = 7;
 const DUR = 15;
@@ -51,8 +89,16 @@ function onMove(e) {
   if (!raf) raf = requestAnimationFrame(applyTilt);
 }
 
-onMounted(() => { if (!reduce) window.addEventListener('pointermove', onMove, { passive: true }); });
-onBeforeUnmount(() => { window.removeEventListener('pointermove', onMove); if (raf) cancelAnimationFrame(raf); });
+onMounted(() => {
+  if (!reduce) window.addEventListener('pointermove', onMove, { passive: true });
+  clockTimer = setInterval(() => { now.value = new Date(); }, 20000);
+  loadWeather();
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('pointermove', onMove);
+  if (raf) cancelAnimationFrame(raf);
+  clearInterval(clockTimer);
+});
 
 const MODULE_LABEL = { notes: 'Notes', meetings: 'Meetings', clients: 'Clients', projects: 'Projects', tags: 'Tags' };
 function metaFor(w) {
@@ -88,8 +134,22 @@ async function onLogout() {
 
     <div class="content">
       <header class="topbar">
-        <div class="brand"><span class="mark">m</span> Minutes</div>
-        <button class="signout" @click="onLogout">Sign out</button>
+        <div class="wordmark" aria-label="Minutes">
+          <span
+            v-for="(ch, i) in brandLetters"
+            :key="i"
+            class="ch"
+            :style="{ animationDelay: (0.15 + i * 0.075) + 's' }"
+          >{{ ch }}</span>
+          <span class="caret" aria-hidden="true" />
+        </div>
+        <div class="status">
+          <span v-if="weather" class="chip wx" :title="weather.city">{{ weather.icon }} {{ weather.temp }}{{ weather.unit }}</span>
+          <span class="chip clock">{{ timeStr }}</span>
+          <span class="sep">·</span>
+          <span class="chip date">{{ dateStr }}</span>
+          <button class="signout" @click="onLogout">Sign out</button>
+        </div>
       </header>
 
       <main class="hub">
@@ -159,17 +219,51 @@ async function onLogout() {
   padding: clamp(1.25rem, 3vw, 2.5rem);
   transition: opacity .45s ease-in, transform .45s ease-in;
 }
-.topbar { display: flex; align-items: center; justify-content: space-between; }
-.brand { display: flex; align-items: center; gap: .55rem; font-weight: 600; letter-spacing: .01em; }
-.mark {
-  width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
-  background: #C65D3E; color: #FBF8F3; font-family: "IBM Plex Serif", Georgia, serif; font-size: 1.05rem;
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+
+/* --- Outline "bubble" wordmark, typed out on load --- */
+.wordmark {
+  display: inline-flex; align-items: center;
+  font-family: "IBM Plex Serif", Georgia, serif; font-weight: 700;
+  font-size: 1.85rem; letter-spacing: 0.01em; line-height: 1; user-select: none;
 }
+.wordmark .ch {
+  color: transparent;
+  -webkit-text-stroke: 1.6px rgb(var(--c-terracotta));
+  opacity: 0; transform: translateY(0.28em);
+  animation: chIn 0.34s cubic-bezier(.2,.8,.2,1) forwards;
+  transition: color 0.25s ease;
+}
+.wordmark:hover .ch { color: rgb(var(--c-terracotta) / 0.14); }
+@keyframes chIn { to { opacity: 1; transform: translateY(0); } }
+.wordmark .caret {
+  width: 2px; height: 1.05em; margin-left: 4px; border-radius: 1px;
+  background: rgb(var(--c-terracotta));
+  animation: caretBlink 0.9s steps(1) 5, caretGone 0.3s ease 4.5s forwards;
+}
+@keyframes caretBlink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+@keyframes caretGone { to { opacity: 0; } }
+
+/* --- Time / date / weather cluster --- */
+.status { display: inline-flex; align-items: center; gap: 0.55rem; font-size: 0.85rem; color: rgb(var(--c-slate-warm)); }
+.status .chip { white-space: nowrap; }
+.status .clock { font-variant-numeric: tabular-nums; color: rgb(var(--c-ink)); font-weight: 500; }
+.status .wx { color: rgb(var(--c-ink)); }
+.status .sep { opacity: 0.5; }
 .signout {
   background: none; border: 0; cursor: pointer; color: rgb(var(--c-slate-warm)); font-size: .85rem;
-  padding: .4rem .6rem; border-radius: 6px; transition: color .2s, background .2s;
+  padding: .4rem .6rem; margin-left: .2rem; border-radius: 6px; transition: color .2s, background .2s;
 }
 .signout:hover { color: rgb(var(--c-ink)); background: rgb(var(--c-ink) / 0.06); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wordmark .ch { animation: none; opacity: 1; transform: none; }
+  .wordmark .caret { display: none; }
+}
+@media (max-width: 560px) {
+  .status .date, .status .sep { display: none; }
+  .wordmark { font-size: 1.55rem; }
+}
 
 .hub { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: 940px; margin: 0 auto; width: 100%; }
 .greet {
