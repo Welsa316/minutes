@@ -59,6 +59,14 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     return data;
   }
 
+  // Update any workspace fields (name/icon/color/sections) and reflect locally.
+  async function update(id, body) {
+    const { data } = await api.put(`/workspaces/${id}`, body);
+    const i = list.value.findIndex((w) => w.id === id);
+    if (i >= 0) list.value.splice(i, 1, { ...list.value[i], ...data });
+    return data;
+  }
+
   // Persist a new module set for the active workspace and reflect it locally.
   async function setSections(sections) {
     const w = active.value;
@@ -79,7 +87,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   // Sync the active workspace into the axios interceptor any time it changes.
   watch(activeId, (v) => setApiWorkspaceId(v), { immediate: true });
 
-  return { list, activeId, active, sections, has, loading, load, setActive, setActiveBySlug, create, setSections, toggleModule };
+  return { list, activeId, active, sections, has, loading, load, setActive, setActiveBySlug, create, update, setSections, toggleModule };
 });
 
 // The module types a workspace can switch on. Todos + Dashboard are global and

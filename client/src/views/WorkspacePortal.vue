@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth.js';
 import { useWorkspaceStore } from '../stores/workspace.js';
 import WorkspaceCreate from '../components/WorkspaceCreate.vue';
+import WorkspaceIcon from '../components/WorkspaceIcon.vue';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -96,7 +97,7 @@ async function onLogout() {
             :style="{ '--accent': accent(w) }"
             @click="enter(w)"
           >
-            <span class="ic">{{ w.icon || w.name?.[0] || '?' }}</span>
+            <span class="ic"><WorkspaceIcon :icon="w.icon || w.name?.[0]" /></span>
             <span class="nm">{{ w.name }}</span>
             <span class="meta">{{ metaFor(w) }}</span>
           </button>

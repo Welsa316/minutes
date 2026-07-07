@@ -1,40 +1,51 @@
 <script setup>
 import { ref, reactive, computed, nextTick, onMounted } from 'vue';
 import { useWorkspaceStore, MODULES } from '../stores/workspace.js';
+import WorkspaceIcon from './WorkspaceIcon.vue';
+import WorkspaceIconPicker from './WorkspaceIconPicker.vue';
 
-// firstRun = the blocking onboarding gate for a brand-new account: no Cancel,
-// no click-away close — the user must create a workspace to enter the app.
-const props = defineProps({ firstRun: { type: Boolean, default: false } });
+// firstRun = the blocking onboarding gate for a brand-new account.
+// edit = an existing workspace object → the modal edits it instead of creating.
+const props = defineProps({
+  firstRun: { type: Boolean, default: false },
+  edit: { type: Object, default: null },
+});
 const emit = defineEmits(['close']);
 const ws = useWorkspaceStore();
 
-function requestClose() {
-  if (!props.firstRun) emit('close');
-}
+const COLORS = ['C65D3E', '0F1B2D', '3F6B4C', 'B8863B', '7C5C8A', '3B6B7C'];
 
-const name = ref('');
+const isEdit = computed(() => !!props.edit);
+const name = ref(props.edit?.name || '');
+const icon = ref(props.edit?.icon || 'sparkles');
+const color = ref(props.edit?.color || 'C65D3E');
 const nameInput = ref(null);
-const creating = ref(false);
-// Notes is a sensible default; everything else is opt-in.
-const picked = reactive(new Set(['notes']));
+const saving = ref(false);
+const picked = reactive(new Set(props.edit ? (props.edit.sections || []) : ['notes']));
 
-function toggle(key) {
-  picked.has(key) ? picked.delete(key) : picked.add(key);
-}
+const accent = computed(() => `#${color.value}`);
 
-const canCreate = computed(() => name.value.trim().length > 0 && !creating.value);
+function toggle(key) { picked.has(key) ? picked.delete(key) : picked.add(key); }
 
-async function create() {
+const canSave = computed(() => name.value.trim().length > 0 && !saving.value);
+
+function requestClose() { if (!props.firstRun) emit('close'); }
+
+async function save() {
   const clean = name.value.trim();
   if (!clean) return;
-  creating.value = true;
+  saving.value = true;
   try {
-    const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workspace';
     const sections = MODULES.filter((m) => picked.has(m.key)).map((m) => m.key);
-    await ws.create({ name: clean, slug, icon: clean[0].toUpperCase(), sections });
+    if (isEdit.value) {
+      await ws.update(props.edit.id, { name: clean, icon: icon.value, color: color.value, sections });
+    } else {
+      const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workspace';
+      await ws.create({ name: clean, slug, icon: icon.value, color: color.value, sections });
+    }
     emit('close');
   } finally {
-    creating.value = false;
+    saving.value = false;
   }
 }
 
@@ -47,22 +58,48 @@ onMounted(() => nextTick(() => nameInput.value?.focus()));
       <div class="absolute inset-0 bg-ink/40 backdrop-blur-sm" @click="requestClose" />
       <div class="relative w-full max-w-lg bg-surface border border-sand rounded-xl shadow-2xl overflow-hidden">
         <div class="px-5 pt-5 pb-3">
-          <h2 class="font-serif text-xl text-ink">{{ firstRun ? 'Welcome to Minutes' : 'Create a workspace' }}</h2>
+          <h2 class="font-serif text-xl text-ink">{{ isEdit ? 'Edit workspace' : firstRun ? 'Welcome to Minutes' : 'Create a workspace' }}</h2>
           <p v-if="firstRun" class="text-sm text-slate-warm mt-1">Set up your first workspace to get started.</p>
         </div>
 
-        <div class="px-5 pb-4">
-          <label class="label" for="ws-name">Name</label>
-          <input
-            id="ws-name"
-            ref="nameInput"
-            v-model="name"
-            placeholder="e.g. Freelance, Personal, Acme Inc."
-            class="input"
-            @keydown.enter.prevent="canCreate && create()"
-          />
+        <!-- Name + live avatar preview -->
+        <div class="px-5 pb-3 flex items-end gap-3">
+          <div
+            class="h-11 w-11 grid place-items-center rounded-lg text-warm text-xl shrink-0"
+            :style="{ background: accent }"
+          >
+            <WorkspaceIcon :icon="icon" />
+          </div>
+          <div class="flex-1">
+            <label class="label" for="ws-name">Name</label>
+            <input
+              id="ws-name"
+              ref="nameInput"
+              v-model="name"
+              placeholder="e.g. Freelance, Personal, Acme Inc."
+              class="input"
+              @keydown.enter.prevent="canSave && save()"
+            />
+          </div>
         </div>
 
+        <!-- Icon + color -->
+        <div class="px-5 pb-3">
+          <p class="label">Icon</p>
+          <WorkspaceIconPicker v-model="icon" :accent="accent" />
+          <div class="flex items-center gap-2 mt-3">
+            <button
+              v-for="c in COLORS"
+              :key="c"
+              type="button"
+              @click="color = c"
+              :style="{ background: `#${c}` }"
+              :class="['h-6 w-6 rounded-full border-2 transition-transform hover:scale-110', color === c ? 'border-ink' : 'border-transparent']"
+            />
+          </div>
+        </div>
+
+        <!-- Modules -->
         <div class="px-5 pb-2">
           <p class="text-sm text-slate-warm mb-2">Choose what you want to track — add or remove any of these anytime.</p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -83,10 +120,7 @@ onMounted(() => nextTick(() => nameInput.value?.focus()));
               <span class="flex-1 min-w-0">
                 <span class="flex items-center gap-1.5">
                   <span class="font-medium text-ink">{{ m.label }}</span>
-                  <span
-                    v-if="picked.has(m.key)"
-                    class="ml-auto text-terracotta text-xs"
-                  >✓</span>
+                  <span v-if="picked.has(m.key)" class="ml-auto text-terracotta text-xs">✓</span>
                 </span>
                 <span class="block text-xs text-slate-warm leading-snug mt-0.5">{{ m.desc }}</span>
               </span>
@@ -99,7 +133,7 @@ onMounted(() => nextTick(() => nameInput.value?.focus()));
           <span class="text-xs text-slate-warm">{{ picked.size }} module{{ picked.size === 1 ? '' : 's' }} selected</span>
           <div class="flex items-center gap-2">
             <button v-if="!firstRun" class="btn-ghost text-sm" @click="emit('close')">Cancel</button>
-            <button class="btn-primary text-sm" :disabled="!canCreate" @click="create">Create workspace</button>
+            <button class="btn-primary text-sm" :disabled="!canSave" @click="save">{{ isEdit ? 'Save changes' : 'Create workspace' }}</button>
           </div>
         </div>
       </div>
