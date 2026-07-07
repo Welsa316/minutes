@@ -27,8 +27,8 @@ router.get('/', async (req, res, next) => {
               p.name AS project_name,
               COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS tags
        FROM meetings m
-       LEFT JOIN clients c  ON c.id = m.client_id
-       LEFT JOIN projects p ON p.id = m.project_id
+       LEFT JOIN clients c  ON c.id = m.client_id  AND c.workspace_id = m.workspace_id
+       LEFT JOIN projects p ON p.id = m.project_id AND p.workspace_id = m.workspace_id
        LEFT JOIN entity_tags et ON et.entity_type='meeting' AND et.entity_id=m.id
        LEFT JOIN tags t ON t.id = et.tag_id
        ${clause}
@@ -48,8 +48,8 @@ router.get('/:id', async (req, res, next) => {
               p.name AS project_name,
               COALESCE(JSON_AGG(t.name ORDER BY t.name) FILTER (WHERE t.id IS NOT NULL), '[]'::json) AS tags
        FROM meetings m
-       LEFT JOIN clients c  ON c.id = m.client_id
-       LEFT JOIN projects p ON p.id = m.project_id
+       LEFT JOIN clients c  ON c.id = m.client_id  AND c.workspace_id = m.workspace_id
+       LEFT JOIN projects p ON p.id = m.project_id AND p.workspace_id = m.workspace_id
        LEFT JOIN entity_tags et ON et.entity_type='meeting' AND et.entity_id=m.id
        LEFT JOIN tags t ON t.id = et.tag_id
        WHERE m.id = $1 AND m.workspace_id = $2
