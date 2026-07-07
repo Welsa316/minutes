@@ -1,192 +1,178 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
-import { RouterLink, useRoute } from 'vue-router';
-import { pinned as pinnedApi } from '../api/endpoints.js';
-import { useRecent } from '../composables/useRecent.js';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { RouterLink, useRouter } from 'vue-router';
 import { useSettingsStore } from '../stores/settings.js';
 import { useWorkspaceStore } from '../stores/workspace.js';
-import { useUiStore } from '../stores/ui.js';
-import { clientColor, initials } from '../utils/colors.js';
-import WorkspaceSwitcher from './WorkspaceSwitcher.vue';
-import ModuleManager from './ModuleManager.vue';
+import WorkspaceIcon from './WorkspaceIcon.vue';
+import WorkspaceCreate from './WorkspaceCreate.vue';
+import {
+  LayoutDashboard, Users, FolderKanban, Timer, Receipt, CalendarClock,
+  NotebookPen, MessageSquareText, Milestone, ChartColumn, Tag, ListTodo,
+  Moon, Sun, LogOut,
+} from 'lucide-vue-next';
 
 defineEmits(['logout']);
 
-const route = useRoute();
+const router = useRouter();
 const settings = useSettingsStore();
 const ws = useWorkspaceStore();
-const ui = useUiStore();
-const { items: recents } = useRecent();
-const pinned = ref([]);
-const loading = ref(true);
 
-// Per-workspace entries — only the ones in active workspace.sections show up.
+const systemDark = ref(typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+const isDark = computed(() => settings.theme === 'dark' || (settings.theme === 'system' && systemDark.value));
+function toggleTheme() { settings.theme = isDark.value ? 'light' : 'dark'; }
+
+// Per-workspace destinations — only the ones in the active workspace show.
 const WORKSPACE_LINKS = [
-  { key: 'dashboard', to: '/', label: 'Dashboard', exact: true, always: true },
-  { key: 'clients', to: '/clients', label: 'Clients' },
-  { key: 'projects', to: '/projects', label: 'Projects' },
-  { key: 'time', to: '/time', label: 'Time' },
-  { key: 'invoices', to: '/invoices', label: 'Invoices' },
-  { key: 'meetings', to: '/meetings', label: 'Meetings' },
-  { key: 'notes', to: '/notes', label: 'Notes' },
-  { key: 'tags', to: '/tags', label: 'Tags' },
-  { key: 'feedback', to: '/feedback', label: 'Feedback' },
-  { key: 'roadmap', to: '/roadmap', label: 'Roadmap' },
-  { key: 'metrics', to: '/metrics', label: 'Metrics' },
+  { key: 'dashboard', to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true, always: true },
+  { key: 'clients', to: '/clients', label: 'Clients', icon: Users },
+  { key: 'projects', to: '/projects', label: 'Projects', icon: FolderKanban },
+  { key: 'time', to: '/time', label: 'Time', icon: Timer },
+  { key: 'invoices', to: '/invoices', label: 'Invoices', icon: Receipt },
+  { key: 'meetings', to: '/meetings', label: 'Meetings', icon: CalendarClock },
+  { key: 'notes', to: '/notes', label: 'Notes', icon: NotebookPen },
+  { key: 'feedback', to: '/feedback', label: 'Feedback', icon: MessageSquareText },
+  { key: 'roadmap', to: '/roadmap', label: 'Roadmap', icon: Milestone },
+  { key: 'metrics', to: '/metrics', label: 'Metrics', icon: ChartColumn },
+  { key: 'tags', to: '/tags', label: 'Tags', icon: Tag },
 ];
-
-// Global entries — always shown, workspace-independent.
-const GLOBAL_LINKS = [
-  { key: 'todos', to: '/todos', label: 'Todos' },
-];
-
+const GLOBAL_LINKS = [{ key: 'todos', to: '/todos', label: 'Todos', icon: ListTodo }];
 const wsLinks = computed(() => WORKSPACE_LINKS.filter((l) => l.always || ws.has(l.key)));
 
-async function loadPinned() {
-  loading.value = true;
-  try { pinned.value = await pinnedApi.list(); }
-  catch { pinned.value = []; }
-  loading.value = false;
-}
+// Workspace switcher popover
+const wsOpen = ref(false);
+const wsWrap = ref(null);
+const editing = ref(null);
+const showCreate = ref(false);
+const accent = computed(() => (ws.active?.color ? `#${ws.active.color}` : '#0F1B2D'));
+const activeIcon = computed(() => ws.active?.icon || ws.active?.name?.[0] || '?');
+function pick(id) { ws.setActive(id); wsOpen.value = false; }
+function editWorkspace(w) { wsOpen.value = false; editing.value = w; }
+function goPortal() { wsOpen.value = false; router.push('/home'); }
 
-function pathFor(p) { return `/${p.entity_type === 'note' ? 'notes' : p.entity_type + 's'}/${p.entity_id}`; }
-
-function avatar(p) {
-  if (p.entity_type === 'client') {
-    const palette = clientColor(p.title);
-    return { kind: 'circle', text: initials(p.title), bg: palette.soft, color: palette.text };
-  }
-  return { kind: 'icon', text: p.entity_type === 'project' ? '▤' : p.entity_type === 'meeting' ? '◷' : '✎' };
-}
-
-onMounted(loadPinned);
-watch(() => route.fullPath, loadPinned);
-watch(() => ws.activeId, loadPinned);
+function onDocClick(e) { if (wsWrap.value && !wsWrap.value.contains(e.target)) wsOpen.value = false; }
+onMounted(() => document.addEventListener('mousedown', onDocClick));
+onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 </script>
 
 <template>
-  <aside
-    :class="[
-      'w-60 shrink-0 border-r border-sand bg-warm flex flex-col',
-      'fixed inset-y-0 left-0 z-40 transition-transform duration-300 ease-out',
-      'lg:static lg:translate-x-0 lg:z-auto',
-      ui.sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full',
-    ]"
-  >
-    <div class="px-2 py-3 border-b border-sand flex items-center gap-1">
-      <div class="flex-1 min-w-0"><WorkspaceSwitcher /></div>
-      <button
-        class="lg:hidden btn-ghost px-2 shrink-0"
-        @click="ui.closeSidebar()"
-        title="Close menu"
-      >✕</button>
-    </div>
+  <aside class="rail">
+    <RouterLink to="/home" class="logo" title="Home">m</RouterLink>
 
-    <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-1">
+    <nav class="nav">
       <RouterLink
         v-for="l in wsLinks"
         :key="l.key"
         :to="l.to"
-        v-slot="{ isActive, isExactActive, href, navigate }"
         custom
+        v-slot="{ isActive, isExactActive, href, navigate }"
       >
-        <a
-          :href="href"
-          @click="navigate"
-          :class="[
-            'block px-3 py-1.5 rounded-md text-sm transition-colors',
-            (l.exact ? isExactActive : isActive)
-              ? 'bg-sand text-ink font-medium'
-              : 'text-slate-warm hover:bg-sand/50 hover:text-ink',
-          ]"
-        >{{ l.label }}</a>
+        <a :href="href" @click="navigate" class="item" :class="{ active: l.exact ? isExactActive : isActive }" :title="l.label" :aria-label="l.label">
+          <component :is="l.icon" class="w-5 h-5" :stroke-width="1.9" />
+        </a>
       </RouterLink>
 
-      <p v-if="wsLinks.length === 1" class="px-3 py-1 text-xs text-slate-warm/80 leading-snug">
-        No modules here yet. Add one to start.
-      </p>
+      <span class="divider" />
 
-      <!-- Add/remove modules for this workspace -->
-      <ModuleManager class="mt-0.5" />
-
-      <!-- Global section (workspace-independent) -->
-      <div class="pt-3">
-        <div class="px-3 pb-1 text-[10px] uppercase tracking-wider text-slate-warm">Across all</div>
-        <RouterLink
-          v-for="l in GLOBAL_LINKS"
-          :key="l.key"
-          :to="l.to"
-          v-slot="{ isActive, href, navigate }"
-          custom
-        >
-          <a
-            :href="href"
-            @click="navigate"
-            :class="[
-              'block px-3 py-1.5 rounded-md text-sm transition-colors',
-              isActive ? 'bg-sand text-ink font-medium' : 'text-slate-warm hover:bg-sand/50 hover:text-ink',
-            ]"
-          >{{ l.label }}</a>
-        </RouterLink>
-      </div>
-
-      <div v-if="pinned.length" class="pt-3">
-        <div class="px-3 pb-1 text-[10px] uppercase tracking-wider text-slate-warm">Pinned</div>
-        <RouterLink
-          v-for="p in pinned"
-          :key="`${p.entity_type}-${p.entity_id}`"
-          :to="pathFor(p)"
-          class="px-3 py-1.5 rounded-md text-sm text-slate-warm hover:bg-sand/50 hover:text-ink transition-colors flex items-center gap-2 truncate"
-        >
-          <span
-            v-if="avatar(p).kind === 'circle'"
-            class="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold shrink-0"
-            :style="{ background: avatar(p).bg, color: avatar(p).color }"
-          >{{ avatar(p).text }}</span>
-          <span v-else class="w-5 text-center text-slate-warm shrink-0">{{ avatar(p).text }}</span>
-          <span class="truncate">{{ p.title }}</span>
-        </RouterLink>
-      </div>
-
-      <div v-if="recents.length" class="pt-3">
-        <div class="px-3 pb-1 text-[10px] uppercase tracking-wider text-slate-warm">Recent</div>
-        <RouterLink
-          v-for="r in recents"
-          :key="`${r.kind}-${r.id}`"
-          :to="`/${r.kind === 'note' ? 'notes' : r.kind + 's'}/${r.id}`"
-          class="px-3 py-1 rounded-md text-sm text-slate-warm hover:bg-sand/50 hover:text-ink transition-colors flex items-center gap-2 truncate"
-        >
-          <span class="w-5 text-center text-slate-warm shrink-0 text-xs">{{ r.kind === 'client' ? '◉' : r.kind === 'project' ? '▤' : r.kind === 'meeting' ? '◷' : '✎' }}</span>
-          <span class="truncate">{{ r.title }}</span>
-        </RouterLink>
-      </div>
+      <RouterLink v-for="l in GLOBAL_LINKS" :key="l.key" :to="l.to" custom v-slot="{ isActive, href, navigate }">
+        <a :href="href" @click="navigate" class="item" :class="{ active: isActive }" :title="l.label" :aria-label="l.label">
+          <component :is="l.icon" class="w-5 h-5" :stroke-width="1.9" />
+        </a>
+      </RouterLink>
     </nav>
 
-    <div class="p-3 border-t border-sand space-y-2">
-      <RouterLink v-if="ws.has('meetings')" to="/meetings/new" class="btn-primary w-full text-sm">+ New meeting</RouterLink>
-      <div class="flex items-center gap-1">
-        <button class="btn-ghost flex-1 text-sm" @click="$emit('logout')">Sign out</button>
-        <button
-          class="btn-ghost px-2 text-sm"
-          @click="settings.toggleDensity"
-          :title="`Density: ${settings.density}`"
-        >{{ settings.density === 'compact' ? '≡' : '☰' }}</button>
-        <button
-          class="btn-ghost px-2 text-sm"
-          @click="settings.sound = !settings.sound"
-          :title="settings.sound ? 'Sound on' : 'Sound off'"
-        >{{ settings.sound ? '♪' : '·' }}</button>
-        <button
-          class="btn-ghost px-2 text-sm"
-          @click="settings.cycleTheme"
-          :title="`Theme: ${settings.theme}`"
-        >
-          <span v-if="settings.theme === 'light'">☀</span>
-          <span v-else-if="settings.theme === 'dark'">☾</span>
-          <span v-else>⌖</span>
+    <div class="bottom">
+      <div ref="wsWrap" class="relative">
+        <button class="item wsbtn" @click="wsOpen = !wsOpen" :style="{ background: accent }" :title="ws.active?.name || 'Workspace'" :aria-label="ws.active?.name || 'Workspace'">
+          <span class="text-warm text-base"><WorkspaceIcon :icon="activeIcon" /></span>
         </button>
+        <div v-if="wsOpen" class="pop">
+          <div class="pop-head">Workspaces</div>
+          <div
+            v-for="w in ws.list"
+            :key="w.id"
+            @click="pick(w.id)"
+            :class="['pop-row group/row', w.id === ws.activeId && 'on']"
+          >
+            <span class="pop-ic text-warm" :style="{ background: w.color ? `#${w.color}` : '#0F1B2D' }"><WorkspaceIcon :icon="w.icon || w.name?.[0]" /></span>
+            <span class="flex-1 truncate text-left">{{ w.name }}</span>
+            <button type="button" class="edit" @click.stop="editWorkspace(w)" title="Edit workspace">✎</button>
+          </div>
+          <div class="pop-foot">
+            <button type="button" @click="goPortal">⌂ All workspaces</button>
+            <button type="button" @click="wsOpen = false; showCreate = true">+ New workspace</button>
+          </div>
+        </div>
       </div>
-      <p class="text-[10px] text-slate-warm text-center pt-1">Cmd+K · Cmd+N · ?</p>
+
+      <button class="item" @click="toggleTheme" :title="isDark ? 'Light mode' : 'Dark mode'" :aria-label="isDark ? 'Light mode' : 'Dark mode'">
+        <component :is="isDark ? Sun : Moon" class="w-5 h-5" :stroke-width="1.9" />
+      </button>
+      <button class="item" @click="$emit('logout')" title="Sign out" aria-label="Sign out">
+        <LogOut class="w-5 h-5" :stroke-width="1.9" />
+      </button>
     </div>
+
+    <WorkspaceCreate v-if="showCreate" @close="showCreate = false" />
+    <WorkspaceCreate v-if="editing" :edit="editing" @close="editing = null" />
   </aside>
 </template>
+
+<style scoped>
+/* Liquid-glass vertical rail: translucent, blurred, icon-only. */
+.rail {
+  width: 4rem; flex-shrink: 0; height: 100dvh; z-index: 40;
+  display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+  padding: 0.75rem 0;
+  background: rgb(var(--c-surface) / 0.55);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid rgb(var(--c-sand) / 0.6);
+}
+
+.logo {
+  width: 2.25rem; height: 2.25rem; border-radius: 0.7rem; display: grid; place-items: center;
+  background: #C65D3E; color: #FBF8F3; text-decoration: none;
+  font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1.25rem; font-weight: 600; line-height: 1;
+  margin-bottom: 0.75rem; box-shadow: 0 4px 14px rgb(198 93 62 / 0.35);
+  transition: transform 0.15s ease;
+}
+.logo:hover { transform: translateY(-1px); }
+
+.nav { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; width: 100%; overflow-y: auto; overflow-x: clip; }
+.bottom { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; width: 100%; }
+.divider { width: 1.4rem; height: 1px; background: rgb(var(--c-sand) / 0.8); margin: 0.4rem 0; }
+
+.item {
+  position: relative; width: 2.5rem; height: 2.5rem; border-radius: 0.7rem;
+  display: grid; place-items: center; cursor: pointer; border: 0; background: transparent;
+  color: rgb(var(--c-slate-warm)); transition: color 0.15s, background 0.15s;
+}
+.item:hover { color: rgb(var(--c-ink)); background: rgb(var(--c-ink) / 0.06); }
+.item.active { color: rgb(var(--c-terracotta)); background: rgb(var(--c-terracotta) / 0.12); }
+.item.active::before {
+  content: ''; position: absolute; left: -0.75rem; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 1.4rem; background: rgb(var(--c-terracotta)); border-radius: 0 3px 3px 0;
+}
+.wsbtn { color: #FBF8F3; box-shadow: 0 2px 8px rgb(0 0 0 / 0.2); }
+.wsbtn:hover { background: currentColor; } /* overridden by inline accent; keep hover subtle */
+
+/* Workspace switch popover (escapes the rail to the right). */
+.pop {
+  position: absolute; bottom: 0; left: calc(100% + 0.6rem); width: 14rem; z-index: 60;
+  background: rgb(var(--c-surface)); border: 1px solid rgb(var(--c-sand));
+  border-radius: 0.6rem; box-shadow: 0 18px 40px rgb(0 0 0 / 0.28); padding: 0.35rem;
+}
+.pop-head { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.12em; color: rgb(var(--c-slate-warm)); padding: 0.35rem 0.5rem; }
+.pop-row {
+  display: flex; align-items: center; gap: 0.55rem; padding: 0.4rem 0.5rem; border-radius: 0.4rem;
+  cursor: pointer; font-size: 0.875rem; color: rgb(var(--c-ink));
+}
+.pop-row:hover { background: rgb(var(--c-sand) / 0.5); }
+.pop-row.on { background: rgb(var(--c-sand) / 0.6); }
+.pop-ic { width: 1.5rem; height: 1.5rem; border-radius: 0.4rem; display: grid; place-items: center; font-size: 0.8rem; flex-shrink: 0; }
+.pop-row .edit { opacity: 0; color: rgb(var(--c-slate-warm)); font-size: 0.8rem; }
+.pop-row:hover .edit { opacity: 1; }
+.pop-row .edit:hover { color: rgb(var(--c-ink)); }
+.pop-foot { border-top: 1px solid rgb(var(--c-sand)); margin-top: 0.25rem; padding-top: 0.25rem; display: flex; flex-direction: column; }
+.pop-foot button { text-align: left; font-size: 0.75rem; color: rgb(var(--c-slate-warm)); padding: 0.4rem 0.5rem; border-radius: 0.4rem; }
+.pop-foot button:hover { color: rgb(var(--c-ink)); background: rgb(var(--c-sand) / 0.5); }
+</style>

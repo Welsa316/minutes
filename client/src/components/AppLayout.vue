@@ -26,15 +26,6 @@ watch(() => router.currentRoute.value.fullPath, () => ui.closeSidebar());
 
 <template>
   <div class="min-h-dvh flex bg-warm text-ink">
-    <!-- Mobile backdrop -->
-    <Transition name="backdrop">
-      <div
-        v-if="ui.sidebarOpen"
-        class="fixed inset-0 z-30 bg-ink/40 backdrop-blur-sm lg:hidden"
-        @click="ui.closeSidebar()"
-      />
-    </Transition>
-
     <Sidebar @logout="onLogout" />
 
     <div class="flex-1 flex flex-col min-w-0">

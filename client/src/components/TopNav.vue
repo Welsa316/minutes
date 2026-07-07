@@ -3,10 +3,8 @@ import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { search } from '../api/endpoints.js';
 import { useShortcut, isTyping } from '../composables/useShortcuts.js';
-import { useUiStore } from '../stores/ui.js';
 
 const router = useRouter();
-const ui = useUiStore();
 const q = ref('');
 const results = ref(null);
 const open = ref(false);
@@ -60,14 +58,6 @@ function fmtDate(d) {
 
 <template>
   <header class="h-16 border-b border-sand bg-warm flex items-center px-4 sm:px-6 lg:px-8 gap-2 sm:gap-4 sticky top-0 z-10">
-    <button
-      class="lg:hidden btn-ghost px-2.5 -ml-1 shrink-0 h-10"
-      @click="ui.toggleSidebar()"
-      title="Menu"
-      aria-label="Open menu"
-    >
-      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
-    </button>
     <div ref="wrapper" class="relative flex-1 max-w-xl">
       <input
         ref="inputEl"
