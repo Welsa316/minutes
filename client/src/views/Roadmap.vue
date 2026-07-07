@@ -45,7 +45,7 @@ const shipped = computed(() => items.value.filter((i) => i.lane === 'shipped').l
 function progressOf(i) {
   const total = Number(i.step_total || 0);
   if (total > 0) return Math.round((Number(i.step_done || 0) / total) * 100);
-  return Number(i.progress || 0);
+  return i.lane === 'shipped' ? 100 : 0;
 }
 const avgProgress = computed(() => {
   if (!items.value.length) return 0;
@@ -189,7 +189,9 @@ async function addPhase() {
   newPhase.value = '';
   try {
     const p = await api.addPhase(idea.id, title);
-    if (selected.value === idea) { phases.value.push(p); activePhaseId.value = p.id; scrollToActive(); }
+    if (selected.value === idea && !phases.value.some((x) => x.id === p.id)) {
+      phases.value.push(p); activePhaseId.value = p.id; scrollToActive();
+    }
   } catch { toast.error('Couldn’t add phase'); }
 }
 async function editPhase(p, body) {
@@ -206,13 +208,39 @@ async function removePhase(p) {
   const t = p.steps.length, d = p.steps.filter((s) => s.done).length;
   bumpCounts(idea, -t, -d);
   try { await api.removePhase(p.id); toast.show('Phase removed', { kind: 'info', ttl: 4000 }); }
-  catch { if (i > -1) phases.value.splice(i, 0, p); bumpCounts(idea, t, d); toast.error('Delete failed'); }
+  catch {
+    // Only restore into the live list if this idea is still open — otherwise the
+    // stale phase would land on whatever idea the user has switched to.
+    if (selected.value === idea && i > -1) phases.value.splice(i, 0, p);
+    bumpCounts(idea, t, d);
+    toast.error('Delete failed');
+  }
 }
-async function reorderPhases() {
+
+// --- reorder (drag or keyboard buttons), rolling back to the pre-move order on failure ---
+let phasePrevIds = null;
+function onPhaseDragStart() { phasePrevIds = phases.value.map((p) => p.id); }
+async function persistPhases(prevIds) {
   const idea = selected.value;
   if (!idea) return;
   try { await api.reorderPhases(idea.id, phases.value.map((p) => p.id)); }
-  catch { toast.error('Reorder failed'); }
+  catch {
+    toast.error('Reorder failed');
+    if (prevIds && selected.value === idea) {
+      const byId = new Map(phases.value.map((p) => [p.id, p]));
+      phases.value = prevIds.map((id) => byId.get(id)).filter(Boolean);
+    }
+  }
+}
+function reorderPhases() { persistPhases(phasePrevIds); phasePrevIds = null; }
+function movePhase(p, dir) {
+  const i = phases.value.indexOf(p), j = i + dir;
+  if (i < 0 || j < 0 || j >= phases.value.length) return;
+  const prev = phases.value.map((x) => x.id);
+  const arr = phases.value.slice();
+  arr.splice(j, 0, arr.splice(i, 1)[0]);
+  phases.value = arr;
+  persistPhases(prev);
 }
 
 async function addStep(p) {
@@ -223,7 +251,7 @@ async function addStep(p) {
   try {
     const s = await api.addStep(p.id, label);
     bumpCounts(idea, 1, 0);
-    if (selected.value === idea) p.steps.push(s);
+    if (selected.value === idea && phases.value.includes(p)) p.steps.push(s);
   } catch { toast.error('Couldn’t add step'); }
 }
 async function toggleStep(p, s) {
@@ -249,17 +277,61 @@ async function removeStep(p, s) {
   if (i > -1) p.steps.splice(i, 1);
   bumpCounts(idea, -1, s.done ? -1 : 0);
   try { await api.removeStep(s.id); }
-  catch { if (i > -1) p.steps.splice(i, 0, s); bumpCounts(idea, 1, s.done ? 1 : 0); toast.error('Delete failed'); }
+  catch {
+    // If a concurrent removePhase already dropped this phase, don't re-inflate the
+    // idea's counts against steps that no longer exist.
+    if (phases.value.includes(p)) { if (i > -1) p.steps.splice(i, 0, s); bumpCounts(idea, 1, s.done ? 1 : 0); }
+    toast.error('Delete failed');
+  }
 }
-async function reorderSteps(p) {
+let stepPrev = null;
+function onStepDragStart(p) { stepPrev = { p, ids: p.steps.map((s) => s.id) }; }
+async function persistSteps(p, prevIds) {
   try { await api.reorderSteps(p.id, p.steps.map((s) => s.id)); }
-  catch { toast.error('Reorder failed'); }
+  catch {
+    toast.error('Reorder failed');
+    if (prevIds && phases.value.includes(p)) {
+      const byId = new Map(p.steps.map((s) => [s.id, s]));
+      p.steps = prevIds.map((id) => byId.get(id)).filter(Boolean);
+    }
+  }
+}
+function reorderSteps(p) { persistSteps(p, stepPrev && stepPrev.p === p ? stepPrev.ids : null); stepPrev = null; }
+function moveStep(p, s, dir) {
+  const i = p.steps.indexOf(s), j = i + dir;
+  if (i < 0 || j < 0 || j >= p.steps.length) return;
+  const prev = p.steps.map((x) => x.id);
+  const arr = p.steps.slice();
+  arr.splice(j, 0, arr.splice(i, 1)[0]);
+  p.steps = arr;
+  persistSteps(p, prev);
 }
 
-// Lock body scroll + wire Escape while the focus view is open.
+// Lock body scroll, move focus into the dialog on open and back on close, and
+// wire Escape while the focus view is open.
+const dialogEl = ref(null);
+let lastFocused = null;
 watch(() => !!selected.value, (open) => {
   if (typeof document !== 'undefined') document.documentElement.style.overflow = open ? 'hidden' : '';
+  if (open) {
+    lastFocused = typeof document !== 'undefined' ? document.activeElement : null;
+    nextTick(() => { (dialogEl.value?.querySelector('.fh-close') || dialogEl.value)?.focus(); });
+  } else if (lastFocused && lastFocused.focus) {
+    lastFocused.focus();
+    lastFocused = null;
+  }
 });
+// Keep Tab focus inside the open dialog.
+function trapTab(e) {
+  const el = dialogEl.value;
+  if (!el) return;
+  const nodes = [...el.querySelectorAll('a[href], button, input, textarea, select, [tabindex]:not([tabindex="-1"])')]
+    .filter((n) => !n.disabled && (n.offsetWidth > 0 || n.offsetHeight > 0));
+  if (!nodes.length) return;
+  const first = nodes[0], last = nodes[nodes.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
 function onKey(e) { if (e.key === 'Escape' && selected.value) close(); }
 onMounted(() => { load(); window.addEventListener('keydown', onKey); });
 onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof document !== 'undefined') document.documentElement.style.overflow = ''; });
@@ -320,7 +392,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
     <!-- Full-screen focus view -->
     <Teleport to="body">
       <Transition name="focus">
-        <div v-if="selected" class="focus" role="dialog" aria-modal="true">
+        <div v-if="selected" ref="dialogEl" class="focus" role="dialog" aria-modal="true" :aria-label="selected.title" @keydown.tab="trapTab">
           <header class="focus-head">
             <div class="fh-inner">
               <button class="fh-close" @click="close" aria-label="Close">✕</button>
@@ -342,16 +414,25 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
           <div class="focus-body">
             <!-- LEFT: phase rail -->
             <aside class="focus-nav">
-              <VueDraggable v-model="phases" handle=".pcard-grip" animation="180" class="pcards" @end="reorderPhases">
-                <button
+              <VueDraggable v-model="phases" handle=".pcard-grip" animation="180" class="pcards" @start="onPhaseDragStart" @end="reorderPhases">
+                <div
                   v-for="(p, pi) in phases"
                   :key="p.id"
                   class="pcard"
                   :class="[`state-${phaseState(p)}`, { active: p.id === activePhaseId }]"
                   :style="{ '--i': pi }"
+                  role="button"
+                  tabindex="0"
+                  :aria-current="p.id === activePhaseId ? 'true' : undefined"
                   @click="selectPhase(p)"
+                  @keydown.enter.self="selectPhase(p)"
+                  @keydown.space.self.prevent="selectPhase(p)"
                 >
-                  <span class="pcard-grip" @click.stop title="Drag to reorder">⠿</span>
+                  <div class="pcard-reorder">
+                    <button type="button" class="pmove" @click.stop="movePhase(p, -1)" :disabled="pi === 0" aria-label="Move phase up" title="Move up">↑</button>
+                    <button type="button" class="pmove" @click.stop="movePhase(p, 1)" :disabled="pi === phases.length - 1" aria-label="Move phase down" title="Move down">↓</button>
+                    <span class="pcard-grip" @click.stop title="Drag to reorder">⠿</span>
+                  </div>
                   <div class="pcard-idx">Phase {{ pi + 1 }}</div>
                   <input
                     class="pcard-title"
@@ -365,7 +446,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
                     <span class="ppill" :class="phaseState(p)">{{ PHASE_LABEL[phaseState(p)] }}</span>
                     <span class="pcard-bar"><span :style="{ width: phasePct(p) + '%' }" /></span>
                   </div>
-                </button>
+                </div>
               </VueDraggable>
 
               <form class="pcard add" @submit.prevent="addPhase">
@@ -403,14 +484,16 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
                           class="pnote"
                         />
 
-                        <VueDraggable v-model="p.steps" handle=".sgrip" animation="150" class="steps" @end="reorderSteps(p)">
-                          <div v-for="s in p.steps" :key="s.id" class="step">
+                        <VueDraggable v-model="p.steps" handle=".sgrip" animation="150" class="steps" @start="onStepDragStart(p)" @end="reorderSteps(p)">
+                          <div v-for="(s, si) in p.steps" :key="s.id" class="step">
                             <div class="step-row">
                               <span class="sgrip" title="Drag to reorder">⠿</span>
                               <button type="button" class="scheck" :class="{ on: s.done }" @click="toggleStep(p, s)" :aria-label="s.done ? 'Mark not done' : 'Mark done'">
                                 <svg v-if="s.done" viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                               </button>
                               <input :value="s.label" @change="editStep(s, $event.target.value)" :class="['slabel', { done: s.done }]" />
+                              <button type="button" class="smove" @click="moveStep(p, s, -1)" :disabled="si === 0" aria-label="Move step up" title="Move up">↑</button>
+                              <button type="button" class="smove" @click="moveStep(p, s, 1)" :disabled="si === p.steps.length - 1" aria-label="Move step down" title="Move down">↓</button>
                               <button type="button" class="sdel" @click="removeStep(p, s)" title="Remove step">✕</button>
                             </div>
                             <textarea
@@ -560,8 +643,14 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 .pcard.active { opacity: 1; background: rgb(var(--c-surface)); border-color: rgb(var(--c-terracotta)); box-shadow: -3px 0 0 0 rgb(var(--c-terracotta)), 0 10px 30px rgb(var(--c-terracotta) / 0.1); }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 0.72; transform: none; } }
 .pcard.active { animation: none; }
-.pcard-grip { position: absolute; top: 0.6rem; right: 0.6rem; cursor: grab; color: rgb(var(--c-slate-warm) / 0.5); font-size: 0.8rem; opacity: 0; transition: opacity .15s; }
-.pcard:hover .pcard-grip { opacity: 1; }
+.pcard:focus-visible { outline: 2px solid rgb(var(--c-terracotta) / 0.6); outline-offset: 2px; }
+.pcard-reorder { position: absolute; top: 0.5rem; right: 0.5rem; display: flex; align-items: center; gap: 1px; opacity: 0; transition: opacity .15s; }
+.pcard:hover .pcard-reorder, .pcard:focus-within .pcard-reorder { opacity: 1; }
+.pmove { width: 1.15rem; height: 1.15rem; display: grid; place-items: center; font-size: 0.68rem; line-height: 1; color: rgb(var(--c-slate-warm)); border-radius: 0.25rem; }
+.pmove:hover:not(:disabled) { color: rgb(var(--c-terracotta)); background: rgb(var(--c-sand) / 0.5); }
+.pmove:disabled { opacity: 0.3; cursor: default; }
+.pcard-grip { cursor: grab; color: rgb(var(--c-slate-warm) / 0.5); font-size: 0.8rem; line-height: 1; }
+.pcard-grip:active { cursor: grabbing; }
 .pcard-idx { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; color: rgb(var(--c-slate-warm) / 0.85); margin-bottom: 0.15rem; }
 .pcard-title { width: 100%; font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1rem; line-height: 1.25; color: rgb(var(--c-ink)); background: transparent; border: 0; padding: 0; }
 .pcard-title:focus { outline: none; }
@@ -642,8 +731,13 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 .slabel { flex: 1; min-width: 0; background: transparent; border: 0; font-size: 0.92rem; color: rgb(var(--c-ink)); padding: 0.2rem 0.25rem; border-radius: 0.3rem; }
 .slabel:focus { outline: none; background: rgb(var(--c-sand) / 0.4); }
 .slabel.done { color: rgb(var(--c-slate-warm)); text-decoration: line-through; }
+.smove { color: rgb(var(--c-slate-warm) / 0.55); font-size: 0.7rem; line-height: 1; padding: 0 1px; opacity: 0; transition: opacity .15s; }
+.step:hover .smove, .step:focus-within .smove { opacity: 1; }
+.step:hover .smove:disabled, .step:focus-within .smove:disabled { opacity: 0.25; }
+.smove:hover:not(:disabled) { color: rgb(var(--c-terracotta)); }
+.smove:disabled { cursor: default; }
 .sdel { color: rgb(var(--c-slate-warm) / 0.6); font-size: 0.8rem; opacity: 0; transition: opacity .15s; }
-.step:hover .sdel { opacity: 1; }
+.step:hover .sdel, .step:focus-within .sdel { opacity: 1; }
 .sdel:hover { color: rgb(var(--c-terracotta)); }
 
 .focus-foot { max-width: 54rem; margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid rgb(var(--c-sand)); }
