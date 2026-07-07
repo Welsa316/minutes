@@ -12,6 +12,7 @@ import 'tippy.js/dist/tippy.css';
 import { mentionSuggestion, SlashCommand } from '../composables/tiptapSuggestions.js';
 import { Callout } from '../composables/calloutNode.js';
 import { HeadingFold } from '../composables/collapsibleHeading.js';
+import { FocusBlock } from '../composables/focusMode.js';
 import NoteOutline from './NoteOutline.vue';
 import { useSpeech } from '../composables/useSpeech.js';
 import { api } from '../api/index.js';
@@ -114,8 +115,28 @@ const props = defineProps({
   maxHeight: { type: String, default: '' },
   // Show an auto-built outline rail (jump to / fold sections). For long notes.
   outline: { type: Boolean, default: false },
+  // Premium note canvas: centered ~66ch reading column with generous margins.
+  centered: { type: Boolean, default: false },
+  // Focus mode: dim all but the active paragraph + keep the caret centered.
+  focus: { type: Boolean, default: false },
 });
 const emit = defineEmits(['update:modelValue']);
+const contentRef = ref(null);
+
+// Typewriter scroll — keep the caret vertically centered in its scroll box.
+function centerCaret() {
+  const ed = editor.value;
+  const wrap = contentRef.value;
+  if (!ed || !wrap) return;
+  // The scrollable element: the EditorContent host when maxHeight caps it.
+  const box = wrap.scrollHeight > wrap.clientHeight ? wrap : wrap.closest('[data-note-scroll]') || wrap;
+  try {
+    const caret = ed.view.coordsAtPos(ed.state.selection.head);
+    const rect = box.getBoundingClientRect();
+    const target = box.scrollTop + (caret.top - rect.top) - box.clientHeight / 2;
+    box.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+  } catch { /* coordsAtPos can throw mid-transaction; ignore */ }
+}
 
 const editor = useEditor({
   content: props.modelValue || '',
@@ -149,6 +170,7 @@ const editor = useEditor({
     SlashCommand,
     Callout,
     HeadingFold,
+    FocusBlock,
     Image.configure({
       inline: false,
       allowBase64: false,
@@ -188,6 +210,7 @@ const editor = useEditor({
     },
   },
   onUpdate: ({ editor }) => emit('update:modelValue', editor.getHTML()),
+  onSelectionUpdate: () => { if (props.focus) requestAnimationFrame(centerCaret); },
 });
 
 watch(() => props.modelValue, (v) => {
@@ -227,8 +250,8 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
       :editor="editor"
       class="lg:order-2 lg:w-48 lg:shrink-0 lg:sticky lg:top-4"
     />
-    <div class="flex-1 min-w-0 lg:order-1 border border-sand rounded-md bg-warm focus-within:ring-2 focus-within:ring-terracotta/40 focus-within:border-terracotta transition-colors">
-    <div v-if="editor" class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-sand">
+    <div :class="['flex-1 min-w-0 lg:order-1 transition-colors', centered ? '' : 'border border-sand rounded-md bg-warm focus-within:ring-2 focus-within:ring-terracotta/40 focus-within:border-terracotta', { 'is-focus': focus }]">
+    <div v-if="editor" class="flex flex-wrap items-center gap-0.5 px-2 py-1 border-b border-sand/60 rounded-t-md">
       <button type="button" class="tp-btn" :class="isActive('bold') && 'tp-btn-active'" @click="run(c => c.toggleBold())" title="Bold"><span class="font-bold">B</span></button>
       <button type="button" class="tp-btn" :class="isActive('italic') && 'tp-btn-active'" @click="run(c => c.toggleItalic())" title="Italic"><span class="italic">i</span></button>
       <button type="button" class="tp-btn" :class="isActive('strike') && 'tp-btn-active'" @click="run(c => c.toggleStrike())" title="Strikethrough"><span class="line-through">S</span></button>
@@ -269,11 +292,14 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
       <button type="button" class="tp-btn" :class="isActive('code') && 'tp-btn-active'" @click="run(c => c.toggleCode())" title="Code"><span class="font-mono text-xs">{}</span></button>
       <button type="button" class="tp-btn" :class="isActive('link') && 'tp-btn-active'" @click="setLink">link</button>
     </BubbleMenu>
-    <EditorContent
-      :editor="editor"
-      :class="['px-3 py-2.5', maxHeight && 'overflow-y-auto']"
+    <div
+      ref="contentRef"
+      data-note-scroll
+      :class="[centered ? 'tp-centered py-1' : 'px-3 py-2.5', maxHeight && 'overflow-y-auto']"
       :style="{ minHeight, maxHeight: maxHeight || undefined }"
-    />
+    >
+      <EditorContent :editor="editor" />
+    </div>
     </div>
   </div>
 </template>
@@ -286,6 +312,22 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
   @apply bg-sand text-ink;
 }
 .tp-prose { color: theme('colors.ink'); }
+
+/* Premium note canvas typography (measure is set by the NoteEditor container, so
+   the title and body share one column). Only applies in `centered` mode —
+   meetings' embedded editors stay full-width and unchanged. */
+.tp-centered .tp-prose { font-size: 1.02rem; }
+.tp-centered .tp-prose > :first-child { margin-top: 0; }
+.tp-centered .tp-prose p { line-height: 1.7; margin: 0.45rem 0; }
+.tp-centered .tp-prose h1 { font-size: 1.9rem; margin: 1.5rem 0 0.5rem; letter-spacing: -0.015em; }
+.tp-centered .tp-prose h2 { font-size: 1.4rem; margin: 1.2rem 0 0.4rem; }
+.tp-centered .tp-prose h3 { font-size: 1.18rem; margin: 0.95rem 0 0.3rem; }
+
+/* Focus mode: dim everything but the active top-level block (see focusMode.js). */
+.is-focus .tp-prose > * { transition: opacity 0.35s ease; }
+.is-focus .tp-prose > *:not(.pm-active) { opacity: 0.3; }
+@media (prefers-reduced-motion: reduce) { .is-focus .tp-prose > * { transition: none; } }
+
 .tp-prose h1 { font-family: theme('fontFamily.serif'); font-size: 1.5rem; margin: 0.75rem 0 0.25rem; }
 .tp-prose h2 { font-family: theme('fontFamily.serif'); font-size: 1.25rem; margin: 0.625rem 0 0.25rem; }
 .tp-prose h3 { font-family: theme('fontFamily.serif'); font-size: 1.125rem; margin: 0.5rem 0 0.25rem; }

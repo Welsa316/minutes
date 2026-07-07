@@ -26,8 +26,14 @@ const routes = [
       { path: 'meetings',        name: 'meetings',    component: () => import('../views/Meetings.vue') },
       { path: 'meetings/new',    name: 'meeting-new', component: () => import('../views/MeetingNew.vue') },
       { path: 'meetings/:id',    name: 'meeting',     component: () => import('../views/MeetingDetail.vue') },
-      { path: 'notes',           name: 'notes',       component: () => import('../views/Notes.vue') },
-      { path: 'notes/:id',       name: 'note',        component: () => import('../views/NoteDetail.vue') },
+      {
+        path: 'notes',
+        component: () => import('../views/NotesLayout.vue'),
+        children: [
+          { path: '',    name: 'notes', component: () => import('../views/NoteEmpty.vue') },
+          { path: ':id', name: 'note',  component: () => import('../views/NoteEditor.vue') },
+        ],
+      },
       { path: 'tags',            name: 'tags',        component: () => import('../views/Tags.vue') },
       { path: 'tags/:name',      name: 'tag',         component: () => import('../views/TagDetail.vue') },
       { path: 'todos',           name: 'todos',       component: () => import('../views/Todos.vue') },

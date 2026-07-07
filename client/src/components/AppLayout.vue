@@ -41,8 +41,13 @@ watch(() => router.currentRoute.value.fullPath, () => ui.closeSidebar());
       <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
         <RouterView v-slot="{ Component, route }">
           <Transition name="page" mode="out-in">
-            <!-- Key includes workspace id so switching workspaces fully re-mounts the view. -->
-            <component :is="Component" :key="`${ws.activeId}:${route.fullPath}`" />
+            <!-- Key includes workspace id so switching workspaces fully re-mounts the view.
+                 Notes share one key across /notes/* so the two-pane layout persists
+                 (the rail stays put) while you switch between notes. -->
+            <component
+              :is="Component"
+              :key="route.path.startsWith('/notes') ? `${ws.activeId}:notes` : `${ws.activeId}:${route.fullPath}`"
+            />
           </Transition>
         </RouterView>
       </main>
