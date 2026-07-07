@@ -110,10 +110,15 @@ function onUp() { drag.down = false; }
 function onNodeClick(idea) { if (drag.moved) { drag.moved = false; return; } selectedId.value = idea.id; }
 
 // --- steps: the ordered plan inside the selected idea ---
+// A monotonic token so a slow response for a previously-selected idea can't
+// overwrite the checklist of the one now selected.
+let stepsReq = 0;
 async function loadSteps(id) {
+  const req = ++stepsReq;
   steps.value = [];
   if (!id) return;
-  try { steps.value = await api.steps(id); } catch { steps.value = []; }
+  try { const rows = await api.steps(id); if (req === stepsReq) steps.value = rows; }
+  catch { if (req === stepsReq) steps.value = []; }
 }
 watch(selectedId, (id) => loadSteps(id));
 
@@ -122,21 +127,25 @@ function bumpCounts(idea, dTotal, dDone) {
   idea.step_total = Number(idea.step_total || 0) + dTotal;
   idea.step_done = Number(idea.step_done || 0) + dDone;
 }
+// Each handler captures its idea BEFORE the await, so switching nodes mid-request
+// updates the right idea's counts and never lands a step on the wrong checklist.
 async function addStep() {
   const label = newStep.value.trim();
-  if (!label || !selected.value) return;
+  const idea = selected.value;
+  if (!label || !idea) return;
+  newStep.value = '';
   try {
-    const s = await api.addStep(selected.value.id, label);
-    steps.value.push(s);
-    bumpCounts(selected.value, 1, 0);
-    newStep.value = '';
+    const s = await api.addStep(idea.id, label);
+    bumpCounts(idea, 1, 0);
+    if (selected.value === idea) steps.value.push(s);
   } catch { toast.error('Couldn’t add step'); }
 }
 async function toggleStep(s) {
+  const idea = selected.value;
   s.done = !s.done;
-  bumpCounts(selected.value, 0, s.done ? 1 : -1);
+  bumpCounts(idea, 0, s.done ? 1 : -1);
   try { await api.updateStep(s.id, { done: s.done }); }
-  catch { s.done = !s.done; bumpCounts(selected.value, 0, s.done ? 1 : -1); toast.error('Save failed'); }
+  catch { s.done = !s.done; bumpCounts(idea, 0, s.done ? 1 : -1); toast.error('Save failed'); }
 }
 async function editStep(s, label) {
   const prev = s.label; s.label = label;
@@ -144,14 +153,17 @@ async function editStep(s, label) {
   catch { s.label = prev; toast.error('Save failed'); }
 }
 async function removeStep(s) {
+  const idea = selected.value;
   const i = steps.value.indexOf(s);
   if (i > -1) steps.value.splice(i, 1);
-  bumpCounts(selected.value, -1, s.done ? -1 : 0);
-  try { await api.removeStep(s.id); } catch { toast.error('Delete failed'); loadSteps(selected.value?.id); }
+  bumpCounts(idea, -1, s.done ? -1 : 0);
+  try { await api.removeStep(s.id); }
+  catch { bumpCounts(idea, 1, s.done ? 1 : 0); toast.error('Delete failed'); if (selected.value === idea) loadSteps(idea.id); }
 }
 async function reorderSteps() {
-  if (!selected.value) return;
-  try { await api.reorderSteps(selected.value.id, steps.value.map((s) => s.id)); }
+  const idea = selected.value;
+  if (!idea) return;
+  try { await api.reorderSteps(idea.id, steps.value.map((s) => s.id)); }
   catch { toast.error('Reorder failed'); }
 }
 
