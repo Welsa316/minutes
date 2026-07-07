@@ -8,6 +8,7 @@ import TaskItem from '@tiptap/extension-task-item';
 import Link from '@tiptap/extension-link';
 import Mention from '@tiptap/extension-mention';
 import Image from '@tiptap/extension-image';
+import Placeholder from '@tiptap/extension-placeholder';
 import 'tippy.js/dist/tippy.css';
 import { mentionSuggestion, SlashCommand } from '../composables/tiptapSuggestions.js';
 import { Callout } from '../composables/calloutNode.js';
@@ -171,6 +172,11 @@ const editor = useEditor({
     Callout,
     HeadingFold,
     FocusBlock,
+    // Empty-line hints so the slash menu (and section-making) is discoverable.
+    Placeholder.configure({
+      placeholder: ({ node }) =>
+        node.type.name === 'heading' ? 'Section heading' : "Write, or press '/' for commands",
+    }),
     Image.configure({
       inline: false,
       allowBase64: false,
@@ -225,6 +231,19 @@ function run(cmd) {
   const ed = editor.value;
   if (!ed) return;
   cmd(ed.chain().focus()).run();
+}
+
+// Append a fresh collapsible section (a heading + a blank line) at the end of the
+// note and drop the cursor into the heading — the one-click way to add a section.
+function addSection() {
+  const ed = editor.value;
+  if (!ed) return;
+  const at = ed.state.doc.content.size;
+  ed.chain()
+    .insertContentAt(at, [{ type: 'heading', attrs: { level: 2 } }, { type: 'paragraph' }])
+    .setTextSelection(at + 1)
+    .focus()
+    .run();
 }
 
 function setLink() {
@@ -299,6 +318,15 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
       :style="{ minHeight, maxHeight: maxHeight || undefined }"
     >
       <EditorContent :editor="editor" />
+      <button
+        v-if="centered && editor"
+        type="button"
+        class="tp-add-section"
+        @click="addSection"
+        title="Add a collapsible section"
+      >
+        <span class="tp-add-plus">+</span> Add section
+      </button>
     </div>
     </div>
   </div>
@@ -322,6 +350,42 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
 .tp-centered .tp-prose h1 { font-size: 1.9rem; margin: 1.5rem 0 0.5rem; letter-spacing: -0.015em; }
 .tp-centered .tp-prose h2 { font-size: 1.4rem; margin: 1.2rem 0 0.4rem; }
 .tp-centered .tp-prose h3 { font-size: 1.18rem; margin: 0.95rem 0 0.3rem; }
+/* Section headers get a hairline rule so the doc reads as distinct sections. */
+.tp-centered .tp-prose h1, .tp-centered .tp-prose h2 {
+  border-bottom: 1px solid rgb(var(--c-sand) / 0.7); padding-bottom: 0.28rem;
+}
+
+/* Empty-line placeholder hints (from extension-placeholder) — teaches the slash
+   menu and labels a blank section heading. Shows on the focused empty block. */
+.tp-prose .is-empty::before {
+  content: attr(data-placeholder);
+  color: rgb(var(--c-slate-warm) / 0.5);
+  float: left; height: 0; pointer-events: none; font-weight: 400;
+}
+
+/* Keep the fold chevron gently visible in the note canvas so sections read as
+   foldable — not a hover-only secret. Hide it on a still-empty heading. */
+.tp-centered .tp-prose .fold-h .fold-toggle { opacity: 0.3; }
+.tp-centered .tp-prose .fold-h:hover .fold-toggle,
+.tp-centered .tp-prose .fold-h.is-collapsed .fold-toggle { opacity: 0.75; }
+.tp-centered .tp-prose .fold-h.is-empty .fold-toggle { opacity: 0 !important; }
+
+/* One-click "Add section" affordance under the note. */
+.tp-add-section {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  margin-top: 1rem; padding: 0.3rem 0.15rem;
+  font-size: 0.85rem; color: rgb(var(--c-slate-warm) / 0.75);
+  background: none; border: 0; cursor: pointer;
+  opacity: 0.65; transition: opacity 0.15s, color 0.15s;
+}
+.tp-add-section:hover { opacity: 1; color: rgb(var(--c-terracotta)); }
+.tp-add-section .tp-add-plus {
+  display: inline-grid; place-items: center;
+  width: 1.2rem; height: 1.2rem; border-radius: 0.35rem;
+  border: 1px dashed rgb(var(--c-slate-warm) / 0.4);
+  font-size: 0.95rem; line-height: 1;
+}
+.tp-add-section:hover .tp-add-plus { border-color: rgb(var(--c-terracotta)); }
 
 /* Focus mode: dim everything but the active top-level block (see focusMode.js). */
 .is-focus .tp-prose > * { transition: opacity 0.35s ease; }

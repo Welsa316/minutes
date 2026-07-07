@@ -151,7 +151,7 @@ watch(() => route.params.id, load);
     <div class="flex-1 overflow-y-auto" data-note-scroll>
       <div v-if="draft.cover" class="h-24 sm:h-28 w-full" :style="{ backgroundImage: COVERS[draft.cover] }" />
 
-      <div class="max-w-[42rem] mx-auto px-5 sm:px-8 pt-5 pb-24">
+      <div class="max-w-[60rem] mx-auto px-5 sm:px-10 pt-5 pb-24">
         <div class="flex items-center gap-2 mb-1 -ml-1">
           <NoteIconPicker v-model="draft.icon" />
           <div class="flex-1" />
