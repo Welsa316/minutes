@@ -1,6 +1,5 @@
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
-import { VueDraggable } from 'vue-draggable-plus';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { ideas as api, projects as projectsApi } from '../api/endpoints.js';
 import Skeleton from '../components/Skeleton.vue';
 import { useToastStore } from '../stores/toast.js';
@@ -9,24 +8,35 @@ const toast = useToastStore();
 
 const items = ref([]);
 const loading = ref(true);
-const editing = ref(null);
-const draft = reactive({ title: '', note: '', effort: '', lane: 'considering' });
-const quick = reactive({});
+const selectedId = ref(null);
+const newTitle = ref('');
+const trackEl = ref(null);
 
-const LANES = [
-  { id: 'someday', label: 'Someday' },
-  { id: 'considering', label: 'Considering' },
-  { id: 'next', label: 'Next' },
-  { id: 'building', label: 'Building' },
-  { id: 'shipped', label: 'Shipped' },
+// The pipeline: ideas flow left → right through these stages.
+const STAGES = [
+  { id: 'someday', label: 'Someday', tone: 'idle' },
+  { id: 'considering', label: 'Considering', tone: 'idle' },
+  { id: 'next', label: 'Next', tone: 'plan' },
+  { id: 'building', label: 'Building', tone: 'active' },
+  { id: 'shipped', label: 'Shipped', tone: 'done' },
 ];
+const ORDER = Object.fromEntries(STAGES.map((s, i) => [s.id, i]));
+const stageOf = (i) => STAGES.find((s) => s.id === i.lane) || STAGES[1];
 const EFFORTS = [{ id: '', label: '—' }, { id: 's', label: 'S' }, { id: 'm', label: 'M' }, { id: 'l', label: 'L' }];
 
-const byLane = computed(() => {
-  const groups = Object.fromEntries(LANES.map((l) => [l.id, []]));
-  for (const i of items.value) (groups[i.lane] || groups.considering).push(i);
-  return groups;
+// Ordered by pipeline stage, then manual order — so the track reads as a flow.
+const ordered = computed(() =>
+  [...items.value].sort((a, b) =>
+    (ORDER[a.lane] ?? 1) - (ORDER[b.lane] ?? 1) || (a.sort_order - b.sort_order) || (a.id - b.id)),
+);
+const selected = computed(() => items.value.find((i) => i.id === selectedId.value) || null);
+const shipped = computed(() => items.value.filter((i) => i.lane === 'shipped').length);
+const avgProgress = computed(() => {
+  if (!items.value.length) return 0;
+  return Math.round(items.value.reduce((s, i) => s + Number(i.progress || 0), 0) / items.value.length);
 });
+
+const clamp = (n) => Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
 
 async function load() {
   loading.value = true;
@@ -34,56 +44,40 @@ async function load() {
   loading.value = false;
 }
 
-async function addTo(laneId) {
-  const title = (quick[laneId] || '').trim();
+async function addIdea() {
+  const title = newTitle.value.trim();
   if (!title) return;
-  const row = await api.create({ title, lane: laneId });
-  row.demand = 0;
+  const row = await api.create({ title, lane: 'considering' });
+  row.demand = 0; row.progress = 0;
   items.value.push(row);
-  quick[laneId] = '';
+  newTitle.value = '';
+  selectedId.value = row.id;
+  await nextTick();
 }
 
-// After a drag, the target lane may hold a card whose lane field is still stale —
-// find it and persist the new lane. (Mirrors the Projects kanban pattern.)
-async function onDragEnd(laneId) {
-  for (const i of byLane.value[laneId]) {
-    if (i.lane !== laneId) {
-      const prev = i.lane;
-      i.lane = laneId;
-      try { await api.update(i.id, { lane: laneId }); }
-      catch { i.lane = prev; toast.error('Failed to move'); }
-    }
-  }
+// Optimistic field save (never overwrite locally-derived fields like demand).
+async function patch(idea, body) {
+  const prev = { ...idea };
+  Object.assign(idea, body);
+  try { await api.update(idea.id, body); }
+  catch { Object.assign(idea, prev); toast.error('Save failed'); }
 }
+function setProgress(idea, v) { patch(idea, { progress: clamp(v) }); }
+function setStage(idea, lane) { patch(idea, { lane }); }
+function setEffort(idea, effort) { patch(idea, { effort: effort || null }); }
 
-function openEdit(idea) {
-  editing.value = idea;
-  draft.title = idea.title;
-  draft.note = idea.note || '';
-  draft.effort = idea.effort || '';
-  draft.lane = idea.lane;
-}
-
-async function saveEdit() {
-  const idea = editing.value;
-  if (!idea) return;
-  const title = draft.title.trim();
-  if (!title) return;
+async function convert(idea) {
+  if (idea.project_id) return;
   try {
-    const updated = await api.update(idea.id, {
-      title, note: draft.note || null, effort: draft.effort || null, lane: draft.lane,
-    });
-    Object.assign(idea, { title: updated.title, note: updated.note, effort: updated.effort, lane: updated.lane });
-    editing.value = null;
-  } catch { toast.error('Save failed'); }
+    const p = await projectsApi.create({ name: idea.title });
+    await patch(idea, { project_id: p.id, lane: 'building' });
+    toast.success('Project created');
+  } catch { toast.error('Couldn’t create project'); }
 }
-
-async function destroy() {
-  const idea = editing.value;
-  if (!idea) return;
+async function destroy(idea) {
   const idx = items.value.indexOf(idea);
   if (idx > -1) items.value.splice(idx, 1);
-  editing.value = null;
+  if (selectedId.value === idea.id) selectedId.value = null;
   try {
     await api.remove(idea.id);
     toast.show('Idea deleted', {
@@ -93,17 +87,17 @@ async function destroy() {
   } catch { toast.error('Delete failed'); load(); }
 }
 
-async function convert() {
-  const idea = editing.value;
-  if (!idea || idea.project_id) return;
-  try {
-    const p = await projectsApi.create({ name: idea.title });
-    const updated = await api.update(idea.id, { project_id: p.id, lane: 'building' });
-    Object.assign(idea, { project_id: p.id, lane: updated.lane });
-    editing.value = null;
-    toast.success('Project created');
-  } catch { toast.error('Couldn’t create project'); }
+// Drag-to-scroll the track; a real drag suppresses the node click that follows.
+let drag = { down: false, startX: 0, scroll: 0, moved: false };
+function onDown(e) { drag = { down: true, startX: e.pageX, scroll: trackEl.value?.scrollLeft || 0, moved: false }; }
+function onMove(e) {
+  if (!drag.down || !trackEl.value) return;
+  const dx = e.pageX - drag.startX;
+  if (Math.abs(dx) > 4) drag.moved = true;
+  trackEl.value.scrollLeft = drag.scroll - dx;
 }
+function onUp() { drag.down = false; }
+function onNodeClick(idea) { if (drag.moved) { drag.moved = false; return; } selectedId.value = idea.id; }
 
 onMounted(load);
 </script>
@@ -112,102 +106,221 @@ onMounted(load);
   <div class="space-y-5">
     <header class="flex items-baseline justify-between gap-4">
       <h1 class="text-3xl font-serif text-ink">Roadmap</h1>
-      <span class="text-sm text-slate-warm">{{ items.length }} idea{{ items.length === 1 ? '' : 's' }}</span>
+      <span class="text-sm text-slate-warm tabular-nums">
+        {{ items.length }} idea{{ items.length === 1 ? '' : 's' }} · {{ shipped }} shipped · {{ avgProgress }}% avg
+      </span>
     </header>
 
     <Skeleton v-if="loading" :rows="4" />
 
     <template v-else>
-      <p v-if="!items.length" class="text-sm text-slate-warm mb-3">Nothing here yet — drop your first idea into a lane below.</p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-start">
-      <div v-for="lane in LANES" :key="lane.id" class="bg-sand/30 rounded-lg p-2">
-        <div class="flex items-center justify-between px-2 py-1.5 mb-1">
-          <h3 class="font-medium text-sm text-ink">{{ lane.label }}</h3>
-          <span class="text-xs text-slate-warm">{{ byLane[lane.id].length }}</span>
-        </div>
-        <VueDraggable
-          :model-value="byLane[lane.id]"
-          group="ideas"
-          item-key="id"
-          ghost-class="opacity-30"
-          animation="180"
-          class="space-y-2 min-h-[3rem]"
-          @end="onDragEnd(lane.id)"
+      <!-- Pulse track -->
+      <section class="track-wrap">
+        <div class="track-glow" aria-hidden="true" />
+        <div
+          ref="trackEl"
+          class="track"
+          @mousedown="onDown"
+          @mousemove="onMove"
+          @mouseup="onUp"
+          @mouseleave="onUp"
         >
-          <div
-            v-for="i in byLane[lane.id]"
-            :key="i.id"
-            @click="openEdit(i)"
-            class="bg-surface border border-sand rounded-md p-2.5 cursor-grab active:cursor-grabbing hover:border-slate-warm/40 hover:shadow-sm transition-shadow"
+          <button
+            v-for="idea in ordered"
+            :key="idea.id"
+            class="node"
+            :class="[`tone-${stageOf(idea).tone}`, { sel: idea.id === selectedId }]"
+            @click="onNodeClick(idea)"
           >
-            <div class="text-sm text-ink leading-snug">{{ i.title }}</div>
-            <div class="flex items-center gap-2 mt-1.5 text-[11px] text-slate-warm">
-              <span v-if="i.effort" class="uppercase font-medium bg-sand rounded px-1">{{ i.effort }}</span>
-              <span v-if="Number(i.demand) > 0" class="text-terracotta" title="requests from feedback">🔥 {{ i.demand }}</span>
-              <span v-if="i.project_id" title="linked project">▤</span>
+            <div class="node-top">
+              <span class="dot" />
+              <span class="stage">{{ stageOf(idea).label }}</span>
+              <span v-if="Number(idea.demand) > 0" class="demand" title="requests from feedback">🔥 {{ idea.demand }}</span>
             </div>
-          </div>
-        </VueDraggable>
-        <form @submit.prevent="addTo(lane.id)" class="mt-2">
-          <input
-            v-model="quick[lane.id]"
-            placeholder="+ add"
-            class="w-full text-sm bg-transparent px-2 py-1 rounded placeholder-slate-warm/60 focus:outline-none focus:bg-surface/70"
-          />
-        </form>
-      </div>
-      </div>
-    </template>
+            <p class="node-title">{{ idea.title }}</p>
+            <div class="node-foot">
+              <div class="bar"><span class="fill" :style="{ width: (idea.progress || 0) + '%' }" /></div>
+              <span class="pct tabular-nums">{{ idea.progress || 0 }}%</span>
+            </div>
+          </button>
 
-    <!-- Edit modal -->
-    <Teleport to="body">
-      <div v-if="editing" class="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4" @mousedown.self="editing = null">
-        <div class="absolute inset-0 bg-ink/40 backdrop-blur-sm" @click="editing = null" />
-        <div class="relative w-full max-w-md bg-surface border border-sand rounded-xl shadow-2xl p-5 space-y-4">
-          <input
-            v-model="draft.title"
-            class="w-full text-lg font-serif text-ink bg-transparent border-none focus:outline-none focus:ring-0 px-0"
-            placeholder="Idea"
-            @keydown.enter.prevent="saveEdit"
-          />
+          <!-- inline add -->
+          <form class="node add" @submit.prevent="addIdea">
+            <input
+              v-model="newTitle"
+              placeholder="Define an idea…"
+              class="add-input"
+            />
+            <button type="submit" class="add-btn" :disabled="!newTitle.trim()" aria-label="Add idea">＋</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- Drill-down -->
+      <section class="drill">
+        <div class="drill-rule"><span /><em>Deep dive</em><span /></div>
+
+        <div v-if="!selected" class="drill-empty">
+          <div class="drill-empty-ic">◇</div>
+          <p>Select an idea to drill in — set its progress, move it down the pipeline, or ship it.</p>
+        </div>
+
+        <div v-else class="drill-card">
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <input
+              :value="selected.title"
+              @change="patch(selected, { title: $event.target.value.trim() || selected.title })"
+              class="drill-title"
+            />
+            <span :class="['drill-badge', `tone-${stageOf(selected).tone}`]">{{ stageOf(selected).label }}</span>
+          </div>
+
           <textarea
-            v-model="draft.note"
-            rows="3"
-            placeholder="Notes…"
-            class="w-full text-sm text-ink bg-transparent border border-sand rounded-md px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-terracotta/40 resize-none"
+            :value="selected.note || ''"
+            @change="patch(selected, { note: $event.target.value || null })"
+            rows="2"
+            placeholder="What is this and why does it matter?"
+            class="drill-note"
           />
-          <div class="flex items-center gap-4">
-            <div class="flex items-center gap-1">
-              <span class="text-xs text-slate-warm mr-1">Effort</span>
-              <button
-                v-for="e in EFFORTS"
-                :key="e.id"
-                type="button"
-                @click="draft.effort = e.id"
-                :class="['h-6 min-w-[1.5rem] px-1 rounded text-xs', draft.effort === e.id ? 'bg-terracotta text-white' : 'bg-sand text-slate-warm hover:text-ink']"
-              >{{ e.label }}</button>
+
+          <!-- progress -->
+          <div class="mt-4">
+            <div class="flex items-center justify-between text-xs text-slate-warm mb-1.5">
+              <span>Progress</span><span class="tabular-nums text-ink font-medium">{{ selected.progress || 0 }}%</span>
             </div>
-            <label class="flex items-center gap-1 text-xs text-slate-warm">
-              Lane
-              <select v-model="draft.lane" class="bg-transparent text-ink text-sm focus:outline-none">
-                <option v-for="l in LANES" :key="l.id" :value="l.id">{{ l.label }}</option>
+            <input
+              type="range" min="0" max="100" step="5"
+              :value="selected.progress || 0"
+              @input="selected.progress = clamp($event.target.value)"
+              @change="setProgress(selected, $event.target.value)"
+              class="range"
+            />
+          </div>
+
+          <!-- meta -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+            <label class="meta-box">
+              <span class="meta-label">Stage</span>
+              <select :value="selected.lane" @change="setStage(selected, $event.target.value)" class="meta-select">
+                <option v-for="s in STAGES" :key="s.id" :value="s.id">{{ s.label }}</option>
               </select>
             </label>
-          </div>
-          <div class="flex items-center justify-between pt-2 border-t border-sand">
-            <button @click="destroy" class="text-sm text-slate-warm hover:text-terracotta">Delete</button>
-            <div class="flex items-center gap-2">
-              <button
-                v-if="!editing.project_id"
-                @click="convert"
-                class="text-sm text-slate-warm hover:text-ink"
-                title="Create a project from this idea"
-              >→ Project</button>
-              <button @click="saveEdit" class="btn-primary text-sm">Done</button>
+            <div class="meta-box">
+              <span class="meta-label">Effort</span>
+              <div class="flex items-center gap-1">
+                <button
+                  v-for="e in EFFORTS" :key="e.id" type="button"
+                  @click="setEffort(selected, e.id)"
+                  :class="['eff', { on: (selected.effort || '') === e.id }]"
+                >{{ e.label }}</button>
+              </div>
+            </div>
+            <div class="meta-box">
+              <span class="meta-label">Demand</span>
+              <span class="text-lg text-ink">{{ Number(selected.demand) > 0 ? `🔥 ${selected.demand}` : '—' }}</span>
             </div>
           </div>
+
+          <div class="flex items-center justify-between mt-5 pt-3 border-t border-sand">
+            <button @click="destroy(selected)" class="text-sm text-slate-warm hover:text-terracotta">Delete</button>
+            <button
+              v-if="!selected.project_id"
+              @click="convert(selected)"
+              class="btn-primary text-sm"
+            >→ Turn into a project</button>
+            <span v-else class="text-sm text-slate-warm">▤ Linked to a project</span>
+          </div>
         </div>
-      </div>
-    </Teleport>
+      </section>
+    </template>
   </div>
 </template>
+
+<style scoped>
+/* --- pulse track --- */
+.track-wrap { position: relative; }
+.track-glow {
+  position: absolute; inset: 0; pointer-events: none; border-radius: 1rem; opacity: 0.5;
+  background: linear-gradient(90deg, rgb(var(--c-terracotta) / 0.06) 0%, transparent 45%, rgb(var(--c-terracotta) / 0.06) 100%);
+}
+.track {
+  display: flex; align-items: stretch; gap: 1rem; overflow-x: auto; padding: 1.25rem 0.25rem;
+  cursor: grab; scrollbar-width: none;
+}
+.track:active { cursor: grabbing; }
+.track::-webkit-scrollbar { display: none; }
+
+.node {
+  flex-shrink: 0; width: 12.5rem; min-height: 11rem; text-align: left;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 0.75rem;
+  padding: 1rem 1.1rem; border-radius: 1.25rem; cursor: pointer;
+  background: rgb(var(--c-surface) / 0.65); backdrop-filter: blur(14px);
+  border: 1px solid rgb(var(--c-sand)); transition: transform .18s, border-color .18s, box-shadow .18s;
+}
+.node:hover { transform: translateY(-3px); border-color: rgb(var(--c-slate-warm) / 0.4); }
+.node.sel { border-color: rgb(var(--c-terracotta)); box-shadow: 0 0 0 1px rgb(var(--c-terracotta) / 0.5), 0 14px 40px rgb(var(--c-terracotta) / 0.18); }
+
+.node-top { display: flex; align-items: center; gap: 0.5rem; }
+.node-top .dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: rgb(var(--c-slate-warm)); flex-shrink: 0; }
+.node-top .stage { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(var(--c-slate-warm)); }
+.node-top .demand { margin-left: auto; font-size: 0.7rem; color: rgb(var(--c-terracotta)); }
+.node-title { font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1.05rem; line-height: 1.2; color: rgb(var(--c-ink)); }
+.node-foot { display: flex; align-items: center; gap: 0.5rem; }
+.bar { flex: 1; height: 4px; border-radius: 999px; background: rgb(var(--c-sand)); overflow: hidden; }
+.fill { display: block; height: 100%; border-radius: 999px; background: rgb(var(--c-terracotta)); transition: width .3s ease; }
+.pct { font-size: 0.7rem; color: rgb(var(--c-slate-warm)); width: 2.2rem; text-align: right; }
+
+/* tone accents by stage */
+.tone-active .dot, .tone-active .node-top .stage { color: rgb(var(--c-terracotta)); }
+.tone-active .dot { background: rgb(var(--c-terracotta)); box-shadow: 0 0 8px rgb(var(--c-terracotta) / 0.7); animation: pulse 1.8s ease-in-out infinite; }
+.tone-plan .dot { background: #B8863B; }
+.tone-done .dot { background: #3F6B4C; }
+.tone-done .fill, .tone-done .node.sel .fill { background: #3F6B4C; }
+.tone-done .node-title { color: rgb(var(--c-ink)); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) { .tone-active .dot { animation: none; } }
+
+/* add card */
+.node.add {
+  border-style: dashed; background: transparent; align-items: center; justify-content: center;
+  gap: 0.6rem; cursor: default;
+}
+.node.add:hover { transform: none; border-color: rgb(var(--c-terracotta) / 0.5); }
+.add-input { width: 100%; text-align: center; background: transparent; border: 0; font-size: 0.9rem; color: rgb(var(--c-ink)); }
+.add-input::placeholder { color: rgb(var(--c-slate-warm) / 0.6); }
+.add-input:focus { outline: none; }
+.add-btn { font-size: 1.4rem; line-height: 1; color: rgb(var(--c-slate-warm)); }
+.add-btn:hover:not(:disabled) { color: rgb(var(--c-terracotta)); }
+.add-btn:disabled { opacity: 0.4; }
+
+/* --- drill-down --- */
+.drill-rule { display: flex; align-items: center; gap: 0.9rem; margin: 0.5rem 0 1.25rem; }
+.drill-rule span { flex: 1; height: 1px; background: rgb(var(--c-sand)); }
+.drill-rule em { font-style: normal; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: rgb(var(--c-slate-warm)); }
+
+.drill-empty { text-align: center; color: rgb(var(--c-slate-warm)); padding: 2.5rem 1rem; max-width: 26rem; margin: 0 auto; }
+.drill-empty-ic { font-size: 2rem; opacity: 0.5; margin-bottom: 0.75rem; }
+.drill-empty p { font-size: 0.9rem; }
+
+.drill-card {
+  max-width: 40rem; margin: 0 auto; padding: 1.5rem;
+  background: rgb(var(--c-surface) / 0.7); backdrop-filter: blur(16px);
+  border: 1px solid rgb(var(--c-sand)); border-radius: 1rem;
+}
+.drill-title { flex: 1; font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1.5rem; color: rgb(var(--c-ink)); background: transparent; border: 0; }
+.drill-title:focus { outline: none; }
+.drill-badge { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.25rem 0.55rem; border-radius: 0.4rem; background: rgb(var(--c-sand)); color: rgb(var(--c-slate-warm)); white-space: nowrap; }
+.drill-badge.tone-active { background: rgb(var(--c-terracotta) / 0.15); color: rgb(var(--c-terracotta)); }
+.drill-badge.tone-done { background: rgba(63, 107, 76, 0.15); color: #3F6B4C; }
+.drill-badge.tone-plan { background: rgba(184, 134, 59, 0.15); color: #B8863B; }
+.drill-note { width: 100%; background: transparent; border: 1px solid rgb(var(--c-sand)); border-radius: 0.6rem; padding: 0.6rem 0.75rem; font-size: 0.9rem; color: rgb(var(--c-ink)); resize: none; }
+.drill-note:focus { outline: none; box-shadow: 0 0 0 2px rgb(var(--c-terracotta) / 0.4); }
+
+.range { width: 100%; accent-color: rgb(var(--c-terracotta)); cursor: pointer; }
+.meta-box { display: flex; flex-direction: column; gap: 0.35rem; background: rgb(var(--c-sand) / 0.35); border-radius: 0.6rem; padding: 0.6rem 0.75rem; }
+.meta-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgb(var(--c-slate-warm)); }
+.meta-select { background: transparent; border: 0; font-size: 0.9rem; color: rgb(var(--c-ink)); }
+.meta-select:focus { outline: none; }
+.eff { height: 1.5rem; min-width: 1.5rem; padding: 0 0.35rem; border-radius: 0.35rem; font-size: 0.75rem; background: rgb(var(--c-sand)); color: rgb(var(--c-slate-warm)); }
+.eff.on { background: rgb(var(--c-terracotta)); color: #fff; }
+</style>
