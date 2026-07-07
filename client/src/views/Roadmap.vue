@@ -2,7 +2,6 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { ideas as api, projects as projectsApi } from '../api/endpoints.js';
-import EmptyState from '../components/EmptyState.vue';
 import Skeleton from '../components/Skeleton.vue';
 import { useToastStore } from '../stores/toast.js';
 
@@ -117,14 +116,10 @@ onMounted(load);
     </header>
 
     <Skeleton v-if="loading" :rows="4" />
-    <EmptyState
-      v-else-if="!items.length"
-      icon="◈"
-      title="Nothing on the roadmap"
-      hint="Park ideas in a lane, drag them toward Building, and ship."
-    />
 
-    <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-start">
+    <template v-else>
+      <p v-if="!items.length" class="text-sm text-slate-warm mb-3">Nothing here yet — drop your first idea into a lane below.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-start">
       <div v-for="lane in LANES" :key="lane.id" class="bg-sand/30 rounded-lg p-2">
         <div class="flex items-center justify-between px-2 py-1.5 mb-1">
           <h3 class="font-medium text-sm text-ink">{{ lane.label }}</h3>
@@ -161,7 +156,8 @@ onMounted(load);
           />
         </form>
       </div>
-    </div>
+      </div>
+    </template>
 
     <!-- Edit modal -->
     <Teleport to="body">
