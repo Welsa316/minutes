@@ -25,6 +25,7 @@ const WORKSPACE_LINKS = [
   { key: 'dashboard', to: '/', label: 'Dashboard', exact: true, always: true },
   { key: 'clients', to: '/clients', label: 'Clients' },
   { key: 'projects', to: '/projects', label: 'Projects' },
+  { key: 'time', to: '/time', label: 'Time' },
   { key: 'meetings', to: '/meetings', label: 'Meetings' },
   { key: 'notes', to: '/notes', label: 'Notes' },
   { key: 'tags', to: '/tags', label: 'Tags' },

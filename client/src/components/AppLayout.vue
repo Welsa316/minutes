@@ -6,6 +6,7 @@ import { useWorkspaceStore } from '../stores/workspace.js';
 import { useUiStore } from '../stores/ui.js';
 import Sidebar from './Sidebar.vue';
 import TopNav from './TopNav.vue';
+import TimerWidget from './TimerWidget.vue';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -52,6 +53,8 @@ watch(() => router.currentRoute.value.fullPath, () => ui.closeSidebar());
         </RouterView>
       </main>
     </div>
+
+    <TimerWidget />
   </div>
 </template>
 

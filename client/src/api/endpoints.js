@@ -32,6 +32,13 @@ export const metrics = {
   removeSeries: (metric) => api.delete(`/metrics/series/${encodeURIComponent(metric)}`),
 };
 
+export const timeEntries = {
+  ...crud('/time-entries'),
+  running: () => api.get('/time-entries/running').then((r) => r.data),
+  start: (body) => api.post('/time-entries', body).then((r) => r.data),
+  stop: (id) => api.put(`/time-entries/${id}/stop`).then((r) => r.data),
+};
+
 export const search = (q) =>
   api.get('/search', { params: { q } }).then((r) => r.data);
 

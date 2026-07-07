@@ -24,6 +24,7 @@ const routes = [
       { path: 'projects',        name: 'projects',    component: () => import('../views/Projects.vue') },
       { path: 'projects/:id',    name: 'project',     component: () => import('../views/ProjectDetail.vue') },
       { path: 'meetings',        name: 'meetings',    component: () => import('../views/Meetings.vue') },
+      { path: 'time',            name: 'time',        component: () => import('../views/Time.vue') },
       { path: 'meetings/new',    name: 'meeting-new', component: () => import('../views/MeetingNew.vue') },
       { path: 'meetings/:id',    name: 'meeting',     component: () => import('../views/MeetingDetail.vue') },
       {
