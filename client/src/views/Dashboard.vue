@@ -4,6 +4,7 @@ import { RouterLink, useRouter } from 'vue-router';
 import { dashboard } from '../api/endpoints.js';
 import { useAuthStore } from '../stores/auth.js';
 import { useWorkspaceStore } from '../stores/workspace.js';
+import { useSettingsStore } from '../stores/settings.js';
 import Skeleton from '../components/Skeleton.vue';
 import CountUp from '../components/CountUp.vue';
 import Heatmap from '../components/Heatmap.vue';
@@ -11,7 +12,13 @@ import ClientChip from '../components/ClientChip.vue';
 
 const auth = useAuthStore();
 const ws = useWorkspaceStore();
+const settings = useSettingsStore();
 const router = useRouter();
+
+// Little corner lightbulb: flip straight between light and dark.
+const systemDark = ref(typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+const isDark = computed(() => settings.theme === 'dark' || (settings.theme === 'system' && systemDark.value));
+function toggleTheme() { settings.theme = isDark.value ? 'light' : 'dark'; }
 
 const upcoming = ref([]);
 const active = ref([]);
@@ -196,5 +203,22 @@ onMounted(load);
         </ul>
       </section>
     </template>
+
+    <!-- Corner light/dark toggle -->
+    <button
+      @click="toggleTheme"
+      :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+      :class="['fixed bottom-6 right-6 z-40 h-11 w-11 rounded-full bg-surface border shadow-lg grid place-items-center transition-all hover:-translate-y-0.5',
+               isDark ? 'border-sand text-slate-warm hover:text-ink' : 'border-terracotta/40 text-terracotta']"
+    >
+      <svg
+        viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+        class="h-5 w-5" :fill="isDark ? 'none' : 'currentColor'" fill-opacity="0.85"
+      >
+        <path d="M9 18h6" fill="none" />
+        <path d="M10 21h4" fill="none" />
+        <path d="M12 3a6 6 0 0 0-4 10.5c.7.8 1 1.5 1 2.5h6c0-1 .3-1.7 1-2.5A6 6 0 0 0 12 3z" />
+      </svg>
+    </button>
   </div>
 </template>
