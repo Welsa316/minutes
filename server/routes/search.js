@@ -3,6 +3,16 @@ import { query } from '../db/index.js';
 
 const router = Router();
 
+// Pull a short plain-text snippet around the first match of `q` in an HTML body.
+function snippet(html, q) {
+  const text = String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return text.slice(0, 100);
+  const start = Math.max(0, i - 40);
+  return (start > 0 ? '…' : '') + text.slice(start, start + 130).trim() + (start + 130 < text.length ? '…' : '');
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const q = (req.query.q || '').trim();
@@ -31,9 +41,9 @@ router.get('/', async (req, res, next) => {
         [like, ws],
       ),
       query(
-        `SELECT id, title FROM notes
-         WHERE workspace_id = $2 AND deleted_at IS NULL AND title ILIKE $1
-         ORDER BY created_at DESC LIMIT 8`,
+        `SELECT id, title, body FROM notes
+         WHERE workspace_id = $2 AND deleted_at IS NULL AND (title ILIKE $1 OR body ILIKE $1)
+         ORDER BY updated_at DESC NULLS LAST, created_at DESC LIMIT 8`,
         [like, ws],
       ),
     ]);
@@ -41,7 +51,8 @@ router.get('/', async (req, res, next) => {
       clients: c.rows,
       projects: p.rows,
       meetings: m.rows,
-      notes: n.rows,
+      // Body is searched too now; return a snippet (and drop the raw HTML).
+      notes: n.rows.map((r) => ({ id: r.id, title: r.title, snippet: snippet(r.body, q) })),
     });
   } catch (e) { next(e); }
 });
