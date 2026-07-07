@@ -51,6 +51,7 @@ router.put('/:id', async (req, res, next) => {
     if ('note' in body) add('note', body.note || null);
     if ('lane' in body && LANES.includes(body.lane)) add('lane', body.lane);
     if ('effort' in body) add('effort', body.effort || null);
+    if ('progress' in body) add('progress', Math.max(0, Math.min(100, Math.round(Number(body.progress) || 0))));
     if ('sort_order' in body && body.sort_order != null) add('sort_order', body.sort_order);
     if ('project_id' in body) add('project_id', body.project_id || null);
 
