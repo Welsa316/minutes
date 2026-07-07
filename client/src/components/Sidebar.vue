@@ -28,6 +28,9 @@ const WORKSPACE_LINKS = [
   { key: 'meetings', to: '/meetings', label: 'Meetings' },
   { key: 'notes', to: '/notes', label: 'Notes' },
   { key: 'tags', to: '/tags', label: 'Tags' },
+  { key: 'feedback', to: '/feedback', label: 'Feedback' },
+  { key: 'roadmap', to: '/roadmap', label: 'Roadmap' },
+  { key: 'metrics', to: '/metrics', label: 'Metrics' },
 ];
 
 // Global entries — always shown, workspace-independent.

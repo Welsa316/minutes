@@ -22,6 +22,16 @@ export const actionItems = {
   toggle: (id) => api.patch(`/action-items/${id}/toggle`).then((r) => r.data),
 };
 
+// Servlyy founder pipeline.
+export const feedback = crud('/feedback');
+export const ideas = crud('/ideas');
+export const metrics = {
+  list: () => api.get('/metrics').then((r) => r.data),
+  save: (body) => api.post('/metrics', body).then((r) => r.data),
+  remove: (id) => api.delete(`/metrics/${id}`),
+  removeSeries: (metric) => api.delete(`/metrics/series/${encodeURIComponent(metric)}`),
+};
+
 export const search = (q) =>
   api.get('/search', { params: { q } }).then((r) => r.data);
 

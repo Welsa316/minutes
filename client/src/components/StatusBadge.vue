@@ -21,11 +21,19 @@ const COLORS = {
     on_hold: 'bg-slate-warm/20 text-slate-warm',
     done: 'bg-slate-warm/10 text-slate-warm',
   },
+  feedback: {
+    new: 'bg-terracotta/15 text-terracotta',
+    triaged: 'bg-sand text-ink',
+    planned: 'bg-slate-warm/20 text-slate-warm',
+    shipped: 'bg-slate-warm/10 text-slate-warm',
+    declined: 'bg-slate-warm/10 text-slate-warm',
+  },
 };
 
 const OPTIONS = {
   client: ['lead', 'active', 'paused', 'archived'],
   project: ['proposed', 'active', 'on_hold', 'done'],
+  feedback: ['new', 'triaged', 'planned', 'shipped', 'declined'],
 };
 
 const classes = computed(() => COLORS[props.variant]?.[props.status] || 'bg-sand text-ink');
