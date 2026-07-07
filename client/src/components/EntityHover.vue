@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onBeforeUnmount } from 'vue';
 import { useFloating, offset, flip, shift, autoUpdate } from '@floating-ui/vue';
 import { RouterLink } from 'vue-router';
 import { clients, projects, meetings, notes } from '../api/endpoints.js';
@@ -48,6 +48,10 @@ function onLeave() {
   clearTimeout(timer);
   hideTimer = setTimeout(() => { open.value = false; }, 120);
 }
+
+// Cancel pending timers so a hover that's still counting down can't fetch or
+// open after the component is gone.
+onBeforeUnmount(() => { clearTimeout(timer); clearTimeout(hideTimer); });
 
 const palette = computed(() => clientColor(data.value?.name || data.value?.title || ''));
 

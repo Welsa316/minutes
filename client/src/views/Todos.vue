@@ -135,14 +135,16 @@ async function addTo(wsId) {
   }
 }
 
+// Optimistic edits roll back only the affected row, so a failure on one never
+// clobbers other rows edited concurrently.
 async function toggle(t) {
-  const snapshot = items.value;
+  const prevDone = t.done;
   items.value = items.value.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x));
   try {
     const real = await api.toggle(t.id);
     items.value = items.value.map((x) => (x.id === t.id ? { ...x, ...real } : x));
   } catch {
-    items.value = snapshot;
+    items.value = items.value.map((x) => (x.id === t.id ? { ...x, done: prevDone } : x));
     toast.error('Failed to update');
   }
 }
@@ -150,13 +152,13 @@ async function toggle(t) {
 async function updateLabel(t, value) {
   const v = value.trim();
   if (!v || v === t.label) return;
-  const snapshot = items.value;
+  const prevLabel = t.label;
   items.value = items.value.map((x) => (x.id === t.id ? { ...x, label: v } : x));
   try {
     const real = await api.update(t.id, { label: v });
     items.value = items.value.map((x) => (x.id === t.id ? { ...x, ...real } : x));
   } catch {
-    items.value = snapshot;
+    items.value = items.value.map((x) => (x.id === t.id ? { ...x, label: prevLabel } : x));
     toast.error('Failed to update');
   }
 }
@@ -164,20 +166,20 @@ async function updateLabel(t, value) {
 async function updateWorkspace(t, wsIdRaw) {
   const realWsId = wsIdRaw === '' || wsIdRaw == null ? null : Number(wsIdRaw);
   const wsObj = realWsId ? ws.list.find((w) => w.id === realWsId) : null;
-  const snapshot = items.value;
+  const prev = { workspace_id: t.workspace_id, workspace_name: t.workspace_name, workspace_color: t.workspace_color, workspace_icon: t.workspace_icon };
   items.value = items.value.map((x) =>
     x.id === t.id ? { ...x, workspace_id: realWsId, workspace_name: wsObj?.name, workspace_color: wsObj?.color, workspace_icon: wsObj?.icon } : x,
   );
   try {
     await api.update(t.id, { workspace_id: realWsId });
   } catch {
-    items.value = snapshot;
+    items.value = items.value.map((x) => (x.id === t.id ? { ...x, ...prev } : x));
     toast.error('Failed to move');
   }
 }
 
 async function destroy(t) {
-  const snapshot = items.value;
+  const idx = items.value.findIndex((x) => x.id === t.id);
   items.value = items.value.filter((x) => x.id !== t.id);
   try {
     await api.remove(t.id);
@@ -186,7 +188,10 @@ async function destroy(t) {
       action: { label: 'Undo', run: async () => { await api.restore(t.id); toast.success('Restored'); load(); } },
     });
   } catch {
-    items.value = snapshot;
+    // Re-insert only the removed row (at its original spot) — leave others intact.
+    const arr = items.value.slice();
+    arr.splice(idx < 0 ? arr.length : idx, 0, t);
+    items.value = arr;
     toast.error('Failed to delete');
   }
 }
