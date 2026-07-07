@@ -3,6 +3,14 @@ import { query } from '../db/index.js';
 
 const router = Router();
 
+// A workspace tag is only allowed if the caller actually owns that workspace —
+// otherwise the join below would surface another user's workspace metadata.
+async function ownsWorkspace(id, userId) {
+  if (id == null || id === '') return false;
+  const { rows } = await query('SELECT 1 FROM workspaces WHERE id = $1 AND user_id = $2', [id, userId]);
+  return !!rows[0];
+}
+
 // Todos are GLOBAL PER USER — workspace_id is an optional visual tag, not a
 // filter. Mounted without workspaceScope, so req.workspaceId is irrelevant, but
 // every query is scoped to req.userId so one account never sees another's todos.
@@ -25,7 +33,7 @@ router.get('/', async (req, res, next) => {
     const { rows } = await query(
       `SELECT t.*, w.slug AS workspace_slug, w.name AS workspace_name, w.color AS workspace_color, w.icon AS workspace_icon
        FROM todos t
-       LEFT JOIN workspaces w ON w.id = t.workspace_id
+       LEFT JOIN workspaces w ON w.id = t.workspace_id AND w.user_id = t.user_id
        WHERE ${conds.join(' AND ')}
        ORDER BY done ASC, due_date ASC NULLS LAST, sort_order ASC, created_at ASC`,
       params,
@@ -38,10 +46,11 @@ router.post('/', async (req, res, next) => {
   try {
     const { label, due_date, priority, notes, workspace_id } = req.body || {};
     if (!label?.trim()) return res.status(400).json({ error: 'label required' });
+    const wsId = (await ownsWorkspace(workspace_id, req.userId)) ? workspace_id : null;
     const { rows } = await query(
       `INSERT INTO todos (workspace_id, label, due_date, priority, notes, user_id)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [workspace_id || null, label.trim(), due_date || null, priority || null, notes || null, req.userId],
+      [wsId, label.trim(), due_date || null, priority || null, notes || null, req.userId],
     );
     res.status(201).json(rows[0]);
   } catch (e) { next(e); }
@@ -53,6 +62,11 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const body = req.body || {};
+    // A foreign workspace tag is coerced to null (never persisted / surfaced).
+    if (Object.prototype.hasOwnProperty.call(body, 'workspace_id') && body.workspace_id != null
+        && !(await ownsWorkspace(body.workspace_id, req.userId))) {
+      body.workspace_id = null;
+    }
     const ALLOWED = ['label', 'due_date', 'priority', 'done', 'notes', 'workspace_id', 'sort_order'];
     const sets = [];
     const params = [];

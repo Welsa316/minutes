@@ -3,6 +3,14 @@ import { query } from '../db/index.js';
 
 const router = Router();
 
+// Resolve an id to itself only if it belongs to the active workspace, else null —
+// so a client/project from another workspace can never be linked or leaked.
+async function scoped(table, id, workspaceId) {
+  if (id == null || id === '') return null;
+  const { rows } = await query(`SELECT id FROM ${table} WHERE id = $1 AND workspace_id = $2`, [id, workspaceId]);
+  return rows[0]?.id ?? null;
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const { client_id, project_id, upcoming, tag, from, to, trash } = req.query;
@@ -69,6 +77,8 @@ router.post('/', async (req, res, next) => {
   try {
     const { title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary } = req.body || {};
     if (!title) return res.status(400).json({ error: 'title required' });
+    const cid = await scoped('clients', client_id, req.workspaceId);
+    const pid = await scoped('projects', project_id, req.workspaceId);
     const { rows } = await query(
       `INSERT INTO meetings (workspace_id, title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
@@ -76,8 +86,8 @@ router.post('/', async (req, res, next) => {
         req.workspaceId,
         title,
         subject || null,
-        client_id || null,
-        project_id || null,
+        cid,
+        pid,
         date || null,
         location || null,
         pre_notes || null,
@@ -95,6 +105,8 @@ router.put('/:id', async (req, res, next) => {
       title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary,
       pre_layout, during_layout, after_layout,
     } = req.body || {};
+    const cid = await scoped('clients', client_id, req.workspaceId);
+    const pid = await scoped('projects', project_id, req.workspaceId);
     const { rows } = await query(
       `UPDATE meetings SET
          title         = COALESCE($1, title),
@@ -110,7 +122,7 @@ router.put('/:id', async (req, res, next) => {
          during_layout = COALESCE($11, during_layout),
          after_layout  = COALESCE($12, after_layout)
        WHERE id = $13 AND workspace_id = $14 RETURNING *`,
-      [title, subject, client_id, project_id, date, location, pre_notes, live_notes, summary,
+      [title, subject, cid, pid, date, location, pre_notes, live_notes, summary,
        pre_layout ?? null, during_layout ?? null, after_layout ?? null, req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });

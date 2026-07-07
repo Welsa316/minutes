@@ -3,6 +3,13 @@ import { query } from '../db/index.js';
 
 const router = Router();
 
+// A client can only be linked if it belongs to the active workspace, else null.
+async function scoped(table, id, workspaceId) {
+  if (id == null || id === '') return null;
+  const { rows } = await query(`SELECT id FROM ${table} WHERE id = $1 AND workspace_id = $2`, [id, workspaceId]);
+  return rows[0]?.id ?? null;
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const { status, client_id, tag, trash } = req.query;
@@ -55,10 +62,11 @@ router.post('/', async (req, res, next) => {
   try {
     const { name, client_id, status, deadline, budget_cents, description } = req.body || {};
     if (!name) return res.status(400).json({ error: 'name required' });
+    const cid = await scoped('clients', client_id, req.workspaceId);
     const { rows } = await query(
       `INSERT INTO projects (workspace_id, name, client_id, status, deadline, budget_cents, description)
        VALUES ($1, $2, $3, COALESCE($4, 'proposed'), $5, $6, $7) RETURNING *`,
-      [req.workspaceId, name, client_id || null, status || null, deadline || null, budget_cents ?? null, description || null],
+      [req.workspaceId, name, cid, status || null, deadline || null, budget_cents ?? null, description || null],
     );
     res.status(201).json(rows[0]);
   } catch (e) { next(e); }
@@ -67,6 +75,7 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const { name, client_id, status, deadline, budget_cents, description } = req.body || {};
+    const cid = await scoped('clients', client_id, req.workspaceId);
     const { rows } = await query(
       `UPDATE projects SET
          name         = COALESCE($1, name),
@@ -76,7 +85,7 @@ router.put('/:id', async (req, res, next) => {
          budget_cents = $5,
          description  = $6
        WHERE id = $7 AND workspace_id = $8 RETURNING *`,
-      [name, client_id, status, deadline, budget_cents, description, req.params.id, req.workspaceId],
+      [name, cid, status, deadline, budget_cents, description, req.params.id, req.workspaceId],
     );
     if (!rows[0]) return res.status(404).json({ error: 'not found' });
     res.json(rows[0]);

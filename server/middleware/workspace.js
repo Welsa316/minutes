@@ -23,6 +23,13 @@ export async function workspaceScope(req, res, next) {
     if (!ws && headerSlug) {
       ws = (await query('SELECT id, slug FROM workspaces WHERE slug = $1 AND user_id = $2', [headerSlug, userId])).rows[0];
     }
+    // A header naming a REAL workspace owned by someone else is a cross-tenant
+    // attempt — reject it rather than silently serving the caller's default. A
+    // stale/nonexistent id (matches nothing) still falls back gracefully.
+    if (!ws && (headerId || headerSlug)) {
+      const foreign = (await query('SELECT 1 FROM workspaces WHERE id = $1 OR slug = $2 LIMIT 1', [headerId, headerSlug])).rows[0];
+      if (foreign) return res.status(403).json({ error: 'forbidden', code: 'FOREIGN_WORKSPACE' });
+    }
     if (!ws) {
       ws = (await query('SELECT id, slug FROM workspaces WHERE user_id = $1 ORDER BY sort_order ASC, id ASC LIMIT 1', [userId])).rows[0];
     }

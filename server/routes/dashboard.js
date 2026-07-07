@@ -16,7 +16,7 @@ router.get('/', async (req, res, next) => {
                c.name AS client_name,
                m.workspace_id, w.name AS workspace_name, w.color AS workspace_color, w.slug AS workspace_slug
         FROM meetings m
-        LEFT JOIN clients c ON c.id = m.client_id
+        LEFT JOIN clients c ON c.id = m.client_id AND c.workspace_id = m.workspace_id
         JOIN workspaces w ON w.id = m.workspace_id
         WHERE m.deleted_at IS NULL AND m.date >= NOW() AND w.user_id = $1
         ORDER BY m.date ASC
@@ -27,7 +27,7 @@ router.get('/', async (req, res, next) => {
                c.name AS client_name,
                p.workspace_id, w.name AS workspace_name, w.color AS workspace_color, w.slug AS workspace_slug
         FROM projects p
-        LEFT JOIN clients c ON c.id = p.client_id
+        LEFT JOIN clients c ON c.id = p.client_id AND c.workspace_id = p.workspace_id
         JOIN workspaces w ON w.id = p.workspace_id
         WHERE p.deleted_at IS NULL AND p.status = 'active' AND w.user_id = $1
         ORDER BY p.deadline ASC NULLS LAST, p.id DESC
@@ -55,7 +55,7 @@ router.get('/', async (req, res, next) => {
                c.name AS client_name,
                m.workspace_id, w.name AS workspace_name, w.color AS workspace_color, w.slug AS workspace_slug
         FROM meetings m
-        LEFT JOIN clients c ON c.id = m.client_id
+        LEFT JOIN clients c ON c.id = m.client_id AND c.workspace_id = m.workspace_id
         JOIN workspaces w ON w.id = m.workspace_id
         WHERE m.deleted_at IS NULL AND m.date IS NOT NULL AND w.user_id = $1
         ORDER BY m.date DESC
