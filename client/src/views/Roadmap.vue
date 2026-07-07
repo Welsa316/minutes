@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { VueDraggable } from 'vue-draggable-plus';
 import { ideas as api, projects as projectsApi } from '../api/endpoints.js';
 import Skeleton from '../components/Skeleton.vue';
 import { useToastStore } from '../stores/toast.js';
@@ -10,6 +11,8 @@ const items = ref([]);
 const loading = ref(true);
 const selectedId = ref(null);
 const newTitle = ref('');
+const newStep = ref('');
+const steps = ref([]);
 const trackEl = ref(null);
 
 // The pipeline: ideas flow left → right through these stages.
@@ -31,9 +34,16 @@ const ordered = computed(() =>
 );
 const selected = computed(() => items.value.find((i) => i.id === selectedId.value) || null);
 const shipped = computed(() => items.value.filter((i) => i.lane === 'shipped').length);
+// Progress = share of the idea's steps that are done (falls back to the stored
+// value for an idea that has no steps yet).
+function progressOf(i) {
+  const total = Number(i.step_total || 0);
+  if (total > 0) return Math.round((Number(i.step_done || 0) / total) * 100);
+  return Number(i.progress || 0);
+}
 const avgProgress = computed(() => {
   if (!items.value.length) return 0;
-  return Math.round(items.value.reduce((s, i) => s + Number(i.progress || 0), 0) / items.value.length);
+  return Math.round(items.value.reduce((s, i) => s + progressOf(i), 0) / items.value.length);
 });
 
 const clamp = (n) => Math.max(0, Math.min(100, Math.round(Number(n) || 0)));
@@ -99,6 +109,52 @@ function onMove(e) {
 function onUp() { drag.down = false; }
 function onNodeClick(idea) { if (drag.moved) { drag.moved = false; return; } selectedId.value = idea.id; }
 
+// --- steps: the ordered plan inside the selected idea ---
+async function loadSteps(id) {
+  steps.value = [];
+  if (!id) return;
+  try { steps.value = await api.steps(id); } catch { steps.value = []; }
+}
+watch(selectedId, (id) => loadSteps(id));
+
+function bumpCounts(idea, dTotal, dDone) {
+  if (!idea) return;
+  idea.step_total = Number(idea.step_total || 0) + dTotal;
+  idea.step_done = Number(idea.step_done || 0) + dDone;
+}
+async function addStep() {
+  const label = newStep.value.trim();
+  if (!label || !selected.value) return;
+  try {
+    const s = await api.addStep(selected.value.id, label);
+    steps.value.push(s);
+    bumpCounts(selected.value, 1, 0);
+    newStep.value = '';
+  } catch { toast.error('Couldn’t add step'); }
+}
+async function toggleStep(s) {
+  s.done = !s.done;
+  bumpCounts(selected.value, 0, s.done ? 1 : -1);
+  try { await api.updateStep(s.id, { done: s.done }); }
+  catch { s.done = !s.done; bumpCounts(selected.value, 0, s.done ? 1 : -1); toast.error('Save failed'); }
+}
+async function editStep(s, label) {
+  const prev = s.label; s.label = label;
+  try { await api.updateStep(s.id, { label }); }
+  catch { s.label = prev; toast.error('Save failed'); }
+}
+async function removeStep(s) {
+  const i = steps.value.indexOf(s);
+  if (i > -1) steps.value.splice(i, 1);
+  bumpCounts(selected.value, -1, s.done ? -1 : 0);
+  try { await api.removeStep(s.id); } catch { toast.error('Delete failed'); loadSteps(selected.value?.id); }
+}
+async function reorderSteps() {
+  if (!selected.value) return;
+  try { await api.reorderSteps(selected.value.id, steps.value.map((s) => s.id)); }
+  catch { toast.error('Reorder failed'); }
+}
+
 onMounted(load);
 </script>
 
@@ -139,8 +195,8 @@ onMounted(load);
             </div>
             <p class="node-title">{{ idea.title }}</p>
             <div class="node-foot">
-              <div class="bar"><span class="fill" :style="{ width: (idea.progress || 0) + '%' }" /></div>
-              <span class="pct tabular-nums">{{ idea.progress || 0 }}%</span>
+              <div class="bar"><span class="fill" :style="{ width: progressOf(idea) + '%' }" /></div>
+              <span class="pct tabular-nums">{{ progressOf(idea) }}%</span>
             </div>
           </button>
 
@@ -162,7 +218,7 @@ onMounted(load);
 
         <div v-if="!selected" class="drill-empty">
           <div class="drill-empty-ic">◇</div>
-          <p>Select an idea to drill in — set its progress, move it down the pipeline, or ship it.</p>
+          <p>Select an idea to open its plan — add the steps, check them off, and move it down the pipeline.</p>
         </div>
 
         <div v-else class="drill-card">
@@ -178,23 +234,35 @@ onMounted(load);
           <textarea
             :value="selected.note || ''"
             @change="patch(selected, { note: $event.target.value || null })"
-            rows="2"
+            rows="4"
             placeholder="What is this and why does it matter?"
             class="drill-note"
           />
 
-          <!-- progress -->
+          <!-- steps: the plan -->
           <div class="mt-4">
-            <div class="flex items-center justify-between text-xs text-slate-warm mb-1.5">
-              <span>Progress</span><span class="tabular-nums text-ink font-medium">{{ selected.progress || 0 }}%</span>
+            <div class="flex items-center justify-between mb-2">
+              <span class="meta-label">Steps</span>
+              <span v-if="steps.length" class="text-xs tabular-nums text-ink font-medium">{{ selected.step_done || 0 }}/{{ steps.length }} · {{ progressOf(selected) }}%</span>
             </div>
-            <input
-              type="range" min="0" max="100" step="5"
-              :value="selected.progress || 0"
-              @input="selected.progress = clamp($event.target.value)"
-              @change="setProgress(selected, $event.target.value)"
-              class="range"
-            />
+            <div v-if="steps.length" class="bar mb-3"><span class="fill" :style="{ width: progressOf(selected) + '%' }" /></div>
+
+            <VueDraggable v-model="steps" handle=".sgrip" animation="150" class="space-y-1" @end="reorderSteps">
+              <div v-for="s in steps" :key="s.id" class="step">
+                <span class="sgrip" title="Drag to reorder">⠿</span>
+                <button type="button" class="scheck" :class="{ on: s.done }" @click="toggleStep(s)" :aria-label="s.done ? 'Mark not done' : 'Mark done'">
+                  <svg v-if="s.done" viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                </button>
+                <input :value="s.label" @change="editStep(s, $event.target.value)" :class="['slabel', { done: s.done }]" />
+                <button type="button" class="sdel" @click="removeStep(s)" title="Remove step">✕</button>
+              </div>
+            </VueDraggable>
+
+            <form @submit.prevent="addStep" class="step">
+              <span class="sgrip" style="visibility:hidden">⠿</span>
+              <span class="scheck ghost">＋</span>
+              <input v-model="newStep" placeholder="Add a step…" class="slabel" />
+            </form>
           </div>
 
           <!-- meta -->
@@ -317,6 +385,27 @@ onMounted(load);
 .drill-note:focus { outline: none; box-shadow: 0 0 0 2px rgb(var(--c-terracotta) / 0.4); }
 
 .range { width: 100%; accent-color: rgb(var(--c-terracotta)); cursor: pointer; }
+
+/* steps checklist */
+.step { display: flex; align-items: center; gap: 0.5rem; padding: 0.15rem 0; }
+.sgrip { cursor: grab; color: rgb(var(--c-slate-warm) / 0.5); font-size: 0.8rem; line-height: 1; user-select: none; }
+.sgrip:active { cursor: grabbing; }
+.scheck {
+  width: 1.15rem; height: 1.15rem; border-radius: 0.35rem; flex-shrink: 0;
+  border: 1.5px solid rgb(var(--c-sand)); display: grid; place-items: center;
+  color: #fff; transition: background .15s, border-color .15s;
+}
+.scheck.on { background: rgb(var(--c-terracotta)); border-color: rgb(var(--c-terracotta)); }
+.scheck.ghost { border-style: dashed; color: rgb(var(--c-slate-warm)); font-size: 0.85rem; }
+.slabel {
+  flex: 1; min-width: 0; background: transparent; border: 0; font-size: 0.9rem; color: rgb(var(--c-ink));
+  padding: 0.2rem 0.25rem; border-radius: 0.3rem;
+}
+.slabel:focus { outline: none; background: rgb(var(--c-sand) / 0.4); }
+.slabel.done { color: rgb(var(--c-slate-warm)); text-decoration: line-through; }
+.sdel { color: rgb(var(--c-slate-warm) / 0.6); font-size: 0.8rem; opacity: 0; transition: opacity .15s; }
+.step:hover .sdel { opacity: 1; }
+.sdel:hover { color: rgb(var(--c-terracotta)); }
 .meta-box { display: flex; flex-direction: column; gap: 0.35rem; background: rgb(var(--c-sand) / 0.35); border-radius: 0.6rem; padding: 0.6rem 0.75rem; }
 .meta-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgb(var(--c-slate-warm)); }
 .meta-select { background: transparent; border: 0; font-size: 0.9rem; color: rgb(var(--c-ink)); }

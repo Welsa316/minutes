@@ -24,7 +24,14 @@ export const actionItems = {
 
 // Servlyy founder pipeline.
 export const feedback = crud('/feedback');
-export const ideas = crud('/ideas');
+export const ideas = {
+  ...crud('/ideas'),
+  steps: (id) => api.get(`/ideas/${id}/steps`).then((r) => r.data),
+  addStep: (id, label) => api.post(`/ideas/${id}/steps`, { label }).then((r) => r.data),
+  updateStep: (stepId, body) => api.put(`/ideas/steps/${stepId}`, body).then((r) => r.data),
+  removeStep: (stepId) => api.delete(`/ideas/steps/${stepId}`),
+  reorderSteps: (id, order) => api.put(`/ideas/${id}/steps/reorder`, { order }).then((r) => r.data),
+};
 export const metrics = {
   list: () => api.get('/metrics').then((r) => r.data),
   save: (body) => api.post('/metrics', body).then((r) => r.data),
