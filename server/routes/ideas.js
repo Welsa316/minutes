@@ -136,10 +136,11 @@ router.get('/:id/phases', async (req, res, next) => {
 router.post('/:id/phases', async (req, res, next) => {
   try {
     if (!(await ideaInWorkspace(req.params.id, req.workspaceId))) return res.status(404).json({ error: 'not found' });
-    const { rows: ord } = await query('SELECT COALESCE(MAX(sort_order), -1) + 1 AS s FROM idea_phases WHERE idea_id = $1', [req.params.id]);
     const { rows } = await query(
-      'INSERT INTO idea_phases (idea_id, title, note, sort_order) VALUES ($1, $2, $3, $4) RETURNING *',
-      [req.params.id, (req.body?.title || '').trim(), req.body?.note || null, ord[0].s],
+      `INSERT INTO idea_phases (idea_id, title, note, sort_order)
+       VALUES ($1, $2, $3, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM idea_phases WHERE idea_id = $1))
+       RETURNING *`,
+      [req.params.id, (req.body?.title || '').trim(), req.body?.note || null],
     );
     res.status(201).json({ ...rows[0], steps: [] });
   } catch (e) { next(e); }
@@ -148,10 +149,16 @@ router.post('/:id/phases', async (req, res, next) => {
 router.put('/:id/phases/reorder', async (req, res, next) => {
   try {
     if (!(await ideaInWorkspace(req.params.id, req.workspaceId))) return res.status(404).json({ error: 'not found' });
-    const order = Array.isArray(req.body?.order) ? req.body.order : [];
-    for (let i = 0; i < order.length; i++) {
-      await query('UPDATE idea_phases SET sort_order = $1 WHERE id = $2 AND idea_id = $3', [i, order[i], req.params.id]);
-    }
+    const order = Array.isArray(req.body?.order) ? req.body.order.map(Number) : [];
+    if (!order.every(Number.isInteger)) return res.status(400).json({ error: 'order must be integer ids' });
+    // One atomic set-based reindex — a bad element or mid-loop failure can't leave
+    // a half-applied ordering.
+    await query(
+      `UPDATE idea_phases AS p SET sort_order = o.ord - 1
+       FROM unnest($1::int[]) WITH ORDINALITY AS o(id, ord)
+       WHERE p.id = o.id AND p.idea_id = $2`,
+      [order, req.params.id],
+    );
     const { rows } = await query('SELECT * FROM idea_phases WHERE idea_id = $1 ORDER BY sort_order ASC, id ASC', [req.params.id]);
     res.json(rows);
   } catch (e) { next(e); }
@@ -171,7 +178,7 @@ router.put('/phases/:phaseId', async (req, res, next) => {
     const { rows } = await query(
       `UPDATE idea_phases p SET ${sets.join(', ')}
        WHERE p.id = $${vals.length - 1}
-         AND p.idea_id IN (SELECT id FROM ideas WHERE workspace_id = $${vals.length})
+         AND p.idea_id IN (SELECT id FROM ideas WHERE workspace_id = $${vals.length} AND deleted_at IS NULL)
        RETURNING p.*`,
       vals,
     );
@@ -183,7 +190,7 @@ router.put('/phases/:phaseId', async (req, res, next) => {
 router.delete('/phases/:phaseId', async (req, res, next) => {
   try {
     const r = await query(
-      'DELETE FROM idea_phases WHERE id = $1 AND idea_id IN (SELECT id FROM ideas WHERE workspace_id = $2)',
+      'DELETE FROM idea_phases WHERE id = $1 AND idea_id IN (SELECT id FROM ideas WHERE workspace_id = $2 AND deleted_at IS NULL)',
       [req.params.phaseId, req.workspaceId],
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
@@ -196,10 +203,11 @@ router.post('/phases/:phaseId/steps', async (req, res, next) => {
   try {
     const phase = await phaseInWorkspace(req.params.phaseId, req.workspaceId);
     if (!phase) return res.status(404).json({ error: 'not found' });
-    const { rows: ord } = await query('SELECT COALESCE(MAX(sort_order), -1) + 1 AS s FROM idea_steps WHERE phase_id = $1', [req.params.phaseId]);
     const { rows } = await query(
-      'INSERT INTO idea_steps (idea_id, phase_id, label, sort_order) VALUES ($1, $2, $3, $4) RETURNING *',
-      [phase.idea_id, req.params.phaseId, (req.body?.label || '').trim(), ord[0].s],
+      `INSERT INTO idea_steps (idea_id, phase_id, label, sort_order)
+       VALUES ($1, $2, $3, (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM idea_steps WHERE phase_id = $2))
+       RETURNING *`,
+      [phase.idea_id, req.params.phaseId, (req.body?.label || '').trim()],
     );
     res.status(201).json(rows[0]);
   } catch (e) { next(e); }
@@ -208,10 +216,14 @@ router.post('/phases/:phaseId/steps', async (req, res, next) => {
 router.put('/phases/:phaseId/steps/reorder', async (req, res, next) => {
   try {
     if (!(await phaseInWorkspace(req.params.phaseId, req.workspaceId))) return res.status(404).json({ error: 'not found' });
-    const order = Array.isArray(req.body?.order) ? req.body.order : [];
-    for (let i = 0; i < order.length; i++) {
-      await query('UPDATE idea_steps SET sort_order = $1 WHERE id = $2 AND phase_id = $3', [i, order[i], req.params.phaseId]);
-    }
+    const order = Array.isArray(req.body?.order) ? req.body.order.map(Number) : [];
+    if (!order.every(Number.isInteger)) return res.status(400).json({ error: 'order must be integer ids' });
+    await query(
+      `UPDATE idea_steps AS s SET sort_order = o.ord - 1
+       FROM unnest($1::int[]) WITH ORDINALITY AS o(id, ord)
+       WHERE s.id = o.id AND s.phase_id = $2`,
+      [order, req.params.phaseId],
+    );
     const { rows } = await query('SELECT * FROM idea_steps WHERE phase_id = $1 ORDER BY sort_order ASC, id ASC', [req.params.phaseId]);
     res.json(rows);
   } catch (e) { next(e); }
@@ -232,7 +244,7 @@ router.put('/steps/:stepId', async (req, res, next) => {
     const { rows } = await query(
       `UPDATE idea_steps st SET ${sets.join(', ')}
        WHERE st.id = $${vals.length - 1}
-         AND st.idea_id IN (SELECT id FROM ideas WHERE workspace_id = $${vals.length})
+         AND st.idea_id IN (SELECT id FROM ideas WHERE workspace_id = $${vals.length} AND deleted_at IS NULL)
        RETURNING st.*`,
       vals,
     );
@@ -244,7 +256,7 @@ router.put('/steps/:stepId', async (req, res, next) => {
 router.delete('/steps/:stepId', async (req, res, next) => {
   try {
     const r = await query(
-      'DELETE FROM idea_steps WHERE id = $1 AND idea_id IN (SELECT id FROM ideas WHERE workspace_id = $2)',
+      'DELETE FROM idea_steps WHERE id = $1 AND idea_id IN (SELECT id FROM ideas WHERE workspace_id = $2 AND deleted_at IS NULL)',
       [req.params.stepId, req.workspaceId],
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });

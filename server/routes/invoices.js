@@ -147,7 +147,7 @@ router.put('/lines/:lineId', async (req, res, next) => {
     const { rows } = await query(
       `UPDATE invoice_line_items li SET ${sets.join(', ')}
        WHERE li.id = $${vals.length - 1}
-         AND li.invoice_id IN (SELECT id FROM invoices WHERE workspace_id = $${vals.length})
+         AND li.invoice_id IN (SELECT id FROM invoices WHERE workspace_id = $${vals.length} AND deleted_at IS NULL)
        RETURNING li.*`,
       vals,
     );
@@ -160,7 +160,7 @@ router.delete('/lines/:lineId', async (req, res, next) => {
   try {
     const r = await query(
       `DELETE FROM invoice_line_items
-       WHERE id = $1 AND invoice_id IN (SELECT id FROM invoices WHERE workspace_id = $2)`,
+       WHERE id = $1 AND invoice_id IN (SELECT id FROM invoices WHERE workspace_id = $2 AND deleted_at IS NULL)`,
       [req.params.lineId, req.workspaceId],
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
