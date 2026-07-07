@@ -101,40 +101,118 @@ router.delete('/:id/permanent', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// --- steps: the ordered plan inside a roadmap idea ---
+// --- phases: the ordered stages inside a roadmap idea, each with its own steps ---
 async function ideaInWorkspace(ideaId, workspaceId) {
   const { rows } = await query('SELECT 1 FROM ideas WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL', [ideaId, workspaceId]);
   return !!rows[0];
 }
 
-router.get('/:id/steps', async (req, res, next) => {
+// Resolve a phase to its idea, scoped to the workspace. Returns { idea_id } or null.
+async function phaseInWorkspace(phaseId, workspaceId) {
+  const { rows } = await query(
+    `SELECT p.idea_id FROM idea_phases p
+       JOIN ideas i ON i.id = p.idea_id
+      WHERE p.id = $1 AND i.workspace_id = $2 AND i.deleted_at IS NULL`,
+    [phaseId, workspaceId],
+  );
+  return rows[0] || null;
+}
+
+// Phases for an idea, each with its ordered steps nested in.
+router.get('/:id/phases', async (req, res, next) => {
   try {
     if (!(await ideaInWorkspace(req.params.id, req.workspaceId))) return res.status(404).json({ error: 'not found' });
-    const { rows } = await query('SELECT * FROM idea_steps WHERE idea_id = $1 ORDER BY sort_order ASC, id ASC', [req.params.id]);
+    const { rows: phases } = await query('SELECT * FROM idea_phases WHERE idea_id = $1 ORDER BY sort_order ASC, id ASC', [req.params.id]);
+    const { rows: steps } = await query('SELECT * FROM idea_steps WHERE idea_id = $1 ORDER BY sort_order ASC, id ASC', [req.params.id]);
+    const byPhase = new Map();
+    for (const s of steps) {
+      if (!byPhase.has(s.phase_id)) byPhase.set(s.phase_id, []);
+      byPhase.get(s.phase_id).push(s);
+    }
+    res.json(phases.map((p) => ({ ...p, steps: byPhase.get(p.id) || [] })));
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/phases', async (req, res, next) => {
+  try {
+    if (!(await ideaInWorkspace(req.params.id, req.workspaceId))) return res.status(404).json({ error: 'not found' });
+    const { rows: ord } = await query('SELECT COALESCE(MAX(sort_order), -1) + 1 AS s FROM idea_phases WHERE idea_id = $1', [req.params.id]);
+    const { rows } = await query(
+      'INSERT INTO idea_phases (idea_id, title, note, sort_order) VALUES ($1, $2, $3, $4) RETURNING *',
+      [req.params.id, (req.body?.title || '').trim(), req.body?.note || null, ord[0].s],
+    );
+    res.status(201).json({ ...rows[0], steps: [] });
+  } catch (e) { next(e); }
+});
+
+router.put('/:id/phases/reorder', async (req, res, next) => {
+  try {
+    if (!(await ideaInWorkspace(req.params.id, req.workspaceId))) return res.status(404).json({ error: 'not found' });
+    const order = Array.isArray(req.body?.order) ? req.body.order : [];
+    for (let i = 0; i < order.length; i++) {
+      await query('UPDATE idea_phases SET sort_order = $1 WHERE id = $2 AND idea_id = $3', [i, order[i], req.params.id]);
+    }
+    const { rows } = await query('SELECT * FROM idea_phases WHERE idea_id = $1 ORDER BY sort_order ASC, id ASC', [req.params.id]);
     res.json(rows);
   } catch (e) { next(e); }
 });
 
-router.post('/:id/steps', async (req, res, next) => {
+router.put('/phases/:phaseId', async (req, res, next) => {
   try {
-    if (!(await ideaInWorkspace(req.params.id, req.workspaceId))) return res.status(404).json({ error: 'not found' });
-    const { rows: ord } = await query('SELECT COALESCE(MAX(sort_order), -1) + 1 AS s FROM idea_steps WHERE idea_id = $1', [req.params.id]);
+    const body = req.body || {};
+    const sets = [];
+    const vals = [];
+    const add = (col, val) => { sets.push(`${col} = $${vals.push(val)}`); };
+    if ('title' in body) add('title', String(body.title || ''));
+    if ('note' in body) add('note', body.note || null);
+    if ('sort_order' in body) add('sort_order', Math.round(Number(body.sort_order) || 0));
+    if (!sets.length) return res.status(400).json({ error: 'no fields' });
+    vals.push(req.params.phaseId, req.workspaceId);
     const { rows } = await query(
-      'INSERT INTO idea_steps (idea_id, label, sort_order) VALUES ($1, $2, $3) RETURNING *',
-      [req.params.id, (req.body?.label || '').trim(), ord[0].s],
+      `UPDATE idea_phases p SET ${sets.join(', ')}
+       WHERE p.id = $${vals.length - 1}
+         AND p.idea_id IN (SELECT id FROM ideas WHERE workspace_id = $${vals.length})
+       RETURNING p.*`,
+      vals,
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'not found' });
+    res.json(rows[0]);
+  } catch (e) { next(e); }
+});
+
+router.delete('/phases/:phaseId', async (req, res, next) => {
+  try {
+    const r = await query(
+      'DELETE FROM idea_phases WHERE id = $1 AND idea_id IN (SELECT id FROM ideas WHERE workspace_id = $2)',
+      [req.params.phaseId, req.workspaceId],
+    );
+    if (r.rowCount === 0) return res.status(404).json({ error: 'not found' });
+    res.status(204).end();
+  } catch (e) { next(e); }
+});
+
+// --- steps: live inside a phase ---
+router.post('/phases/:phaseId/steps', async (req, res, next) => {
+  try {
+    const phase = await phaseInWorkspace(req.params.phaseId, req.workspaceId);
+    if (!phase) return res.status(404).json({ error: 'not found' });
+    const { rows: ord } = await query('SELECT COALESCE(MAX(sort_order), -1) + 1 AS s FROM idea_steps WHERE phase_id = $1', [req.params.phaseId]);
+    const { rows } = await query(
+      'INSERT INTO idea_steps (idea_id, phase_id, label, sort_order) VALUES ($1, $2, $3, $4) RETURNING *',
+      [phase.idea_id, req.params.phaseId, (req.body?.label || '').trim(), ord[0].s],
     );
     res.status(201).json(rows[0]);
   } catch (e) { next(e); }
 });
 
-router.put('/:id/steps/reorder', async (req, res, next) => {
+router.put('/phases/:phaseId/steps/reorder', async (req, res, next) => {
   try {
-    if (!(await ideaInWorkspace(req.params.id, req.workspaceId))) return res.status(404).json({ error: 'not found' });
+    if (!(await phaseInWorkspace(req.params.phaseId, req.workspaceId))) return res.status(404).json({ error: 'not found' });
     const order = Array.isArray(req.body?.order) ? req.body.order : [];
     for (let i = 0; i < order.length; i++) {
-      await query('UPDATE idea_steps SET sort_order = $1 WHERE id = $2 AND idea_id = $3', [i, order[i], req.params.id]);
+      await query('UPDATE idea_steps SET sort_order = $1 WHERE id = $2 AND phase_id = $3', [i, order[i], req.params.phaseId]);
     }
-    const { rows } = await query('SELECT * FROM idea_steps WHERE idea_id = $1 ORDER BY sort_order ASC, id ASC', [req.params.id]);
+    const { rows } = await query('SELECT * FROM idea_steps WHERE phase_id = $1 ORDER BY sort_order ASC, id ASC', [req.params.phaseId]);
     res.json(rows);
   } catch (e) { next(e); }
 });
