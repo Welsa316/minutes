@@ -30,8 +30,21 @@ const greeting = computed(() => {
   return name ? `${part}, ${name}` : part;
 });
 
-// --- Wordmark: type "Minutes" out letter by letter on load ---
-const brandLetters = 'Minutes'.split('');
+// --- Wordmark: type "Minutes" out on load (JS-driven so it's clearly visible) ---
+const BRAND = 'Minutes';
+const typed = ref('');
+const typingDone = ref(false);
+let typeTimer = 0;
+function startTyping() {
+  let i = 0;
+  const tick = () => {
+    i += 1;
+    typed.value = BRAND.slice(0, i);
+    if (i < BRAND.length) typeTimer = setTimeout(tick, 105);
+    else typingDone.value = true;
+  };
+  typeTimer = setTimeout(tick, 350);
+}
 
 // --- Live clock + date ---
 const now = ref(new Date());
@@ -98,6 +111,7 @@ function onMove(e) {
 
 onMounted(() => {
   if (!reduce) window.addEventListener('pointermove', onMove, { passive: true });
+  startTyping(); // the wordmark types regardless of reduce-motion (subtle, non-vestibular)
   clockTimer = setInterval(() => { now.value = new Date(); }, 20000);
   loadWeather();
 });
@@ -105,6 +119,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointermove', onMove);
   if (raf) cancelAnimationFrame(raf);
   clearInterval(clockTimer);
+  clearTimeout(typeTimer);
 });
 
 const MODULE_LABEL = { notes: 'Notes', meetings: 'Meetings', clients: 'Clients', projects: 'Projects', tags: 'Tags' };
@@ -142,13 +157,7 @@ async function onLogout() {
     <div class="content">
       <header class="topbar">
         <div class="wordmark" aria-label="Minutes">
-          <span
-            v-for="(ch, i) in brandLetters"
-            :key="i"
-            class="ch"
-            :style="{ animationDelay: (0.15 + i * 0.075) + 's' }"
-          >{{ ch }}</span>
-          <span class="caret" aria-hidden="true" />
+          <span class="txt">{{ typed }}</span><span class="caret" :class="{ gone: typingDone }" aria-hidden="true" />
         </div>
         <div class="status">
           <span v-if="weather" class="chip wx" :title="weather.city">{{ weather.icon }} {{ weather.temp }}{{ weather.unit }}</span>
@@ -234,28 +243,21 @@ async function onLogout() {
 }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 
-/* --- Outline "bubble" wordmark, typed out on load --- */
+/* --- Wordmark: a clean serif that types itself out on load --- */
 .wordmark {
   display: inline-flex; align-items: center;
-  font-family: "IBM Plex Serif", Georgia, serif; font-weight: 700;
-  font-size: 1.85rem; letter-spacing: 0.01em; line-height: 1; user-select: none;
+  font-family: "IBM Plex Serif", Georgia, serif; font-weight: 600;
+  font-size: 1.7rem; letter-spacing: 0.005em; line-height: 1; user-select: none;
+  color: rgb(var(--c-terracotta)); min-width: 5.4em;
 }
-.wordmark .ch {
-  color: transparent;
-  -webkit-text-stroke: 1.6px rgb(var(--c-terracotta));
-  opacity: 0; transform: translateY(0.28em);
-  animation: chIn 0.34s cubic-bezier(.2,.8,.2,1) forwards;
-  transition: color 0.25s ease;
-}
-.wordmark:hover .ch { color: rgb(var(--c-terracotta) / 0.14); }
-@keyframes chIn { to { opacity: 1; transform: translateY(0); } }
 .wordmark .caret {
-  width: 2px; height: 1.05em; margin-left: 4px; border-radius: 1px;
+  width: 2px; height: 1.02em; margin-left: 3px; border-radius: 1px;
   background: rgb(var(--c-terracotta));
-  animation: caretBlink 0.9s steps(1) 5, caretGone 0.3s ease 4.5s forwards;
+  animation: caretBlink 1s steps(1) infinite;
 }
+.wordmark .caret.gone { animation: caretBlink 1s steps(1) 3, caretFade .4s ease 3s forwards; }
 @keyframes caretBlink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
-@keyframes caretGone { to { opacity: 0; } }
+@keyframes caretFade { to { opacity: 0; } }
 
 /* --- Time / date / weather cluster --- */
 .status { display: inline-flex; align-items: center; gap: 0.55rem; font-size: 0.85rem; color: rgb(var(--c-slate-warm)); }
@@ -275,10 +277,6 @@ async function onLogout() {
 }
 .signout:hover { color: rgb(var(--c-ink)); background: rgb(var(--c-ink) / 0.06); }
 
-@media (prefers-reduced-motion: reduce) {
-  .wordmark .ch { animation: none; opacity: 1; transform: none; }
-  .wordmark .caret { display: none; }
-}
 @media (max-width: 560px) {
   .status .date, .status .sep { display: none; }
   .wordmark { font-size: 1.55rem; }
