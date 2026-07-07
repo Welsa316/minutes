@@ -3,11 +3,18 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import { pushWithoutTransition } from '../router/index.js';
 import { useAuthStore } from '../stores/auth.js';
 import { useWorkspaceStore } from '../stores/workspace.js';
+import { useSettingsStore } from '../stores/settings.js';
 import WorkspaceCreate from '../components/WorkspaceCreate.vue';
 import WorkspaceIcon from '../components/WorkspaceIcon.vue';
 
 const auth = useAuthStore();
 const ws = useWorkspaceStore();
+const settings = useSettingsStore();
+
+// Light/dark toggle — the portal has no sidebar, so it needs its own.
+const systemDark = ref(typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+const isDark = computed(() => settings.theme === 'dark' || (settings.theme === 'system' && systemDark.value));
+function toggleTheme() { settings.theme = isDark.value ? 'light' : 'dark'; }
 
 const reduce = typeof window !== 'undefined'
   && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -148,6 +155,12 @@ async function onLogout() {
           <span class="chip clock">{{ timeStr }}</span>
           <span class="sep">·</span>
           <span class="chip date">{{ dateStr }}</span>
+          <button class="theme" :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'" @click="toggleTheme">
+            <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none" width="16" height="16">
+              <template v-if="isDark"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></template>
+              <path v-else d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+            </svg>
+          </button>
           <button class="signout" @click="onLogout">Sign out</button>
         </div>
       </header>
@@ -250,6 +263,12 @@ async function onLogout() {
 .status .clock { font-variant-numeric: tabular-nums; color: rgb(var(--c-ink)); font-weight: 500; }
 .status .wx { color: rgb(var(--c-ink)); }
 .status .sep { opacity: 0.5; }
+.theme {
+  display: grid; place-items: center; background: none; border: 0; cursor: pointer;
+  color: rgb(var(--c-slate-warm)); padding: .35rem; border-radius: 8px;
+  transition: color .2s, background .2s;
+}
+.theme:hover { color: rgb(var(--c-terracotta)); background: rgb(var(--c-ink) / 0.06); }
 .signout {
   background: none; border: 0; cursor: pointer; color: rgb(var(--c-slate-warm)); font-size: .85rem;
   padding: .4rem .6rem; margin-left: .2rem; border-radius: 6px; transition: color .2s, background .2s;
