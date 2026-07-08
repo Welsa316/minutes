@@ -1,12 +1,14 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
+import { useRoute } from 'vue-router';
 import { ideas as api, projects as projectsApi } from '../api/endpoints.js';
 import Skeleton from '../components/Skeleton.vue';
 import AnimatedCheck from '../components/AnimatedCheck.vue';
 import { useToastStore } from '../stores/toast.js';
 
 const toast = useToastStore();
+const route = useRoute();
 
 const items = ref([]);
 const loading = ref(true);
@@ -334,7 +336,13 @@ function trapTab(e) {
   else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
 }
 function onKey(e) { if (e.key === 'Escape' && selected.value) close(); }
-onMounted(() => { load(); window.addEventListener('keydown', onKey); });
+onMounted(async () => {
+  window.addEventListener('keydown', onKey);
+  await load();
+  // Deep-link: /roadmap?idea=123 (e.g. from a meeting) opens that plan's focus view.
+  const q = Number(route.query.idea);
+  if (q && items.value.some((i) => i.id === q)) selectedId.value = q;
+});
 onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof document !== 'undefined') document.documentElement.style.overflow = ''; });
 </script>
 

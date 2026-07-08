@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
-import { meetings, clients, projects } from '../api/endpoints.js';
+import { meetings, clients, projects, ideas } from '../api/endpoints.js';
 import TiptapEditor from '../components/TiptapEditor.vue';
 import NoteBoard from '../components/NoteBoard.vue';
 import LayoutToggle from '../components/LayoutToggle.vue';
@@ -25,6 +25,7 @@ const dateLocal = ref('');
 const actionItems = ref([]);
 const allClients = ref([]);
 const allProjects = ref([]);
+const allRoadmaps = ref([]);
 const loading = ref(true);
 
 const TABS = ['pre', 'during', 'after'];
@@ -48,6 +49,7 @@ const autosave = useAutosave({
     body.date = dateLocal.value ? new Date(dateLocal.value).toISOString() : null;
     delete body.client_name;
     delete body.project_name;
+    delete body.roadmap_title;
     delete body.action_items;
     delete body.tags;
     delete body.created_at;
@@ -61,10 +63,11 @@ const autosave = useAutosave({
 async function load() {
   loading.value = true;
   const id = route.params.id;
-  const [m, c, p] = await Promise.all([
+  const [m, c, p, r] = await Promise.all([
     meetings.get(id),
     clients.list(),
     projects.list(),
+    ideas.list().catch(() => []),
   ]);
   const { action_items, ...rest } = m;
   original.value = rest;
@@ -95,6 +98,7 @@ async function load() {
   actionItems.value = action_items || [];
   allClients.value = c;
   allProjects.value = p;
+  allRoadmaps.value = r;
   loading.value = false;
   autosave.seed();
   recent.visit({ kind: 'meeting', id: m.id, title: m.title });
@@ -124,6 +128,10 @@ async function destroy() {
     },
   });
   router.replace('/meetings');
+}
+
+function openRoadmap() {
+  if (draft.value?.roadmap_id) router.push({ name: 'roadmap', query: { idea: draft.value.roadmap_id } });
 }
 
 function toLocalInput(iso) {
@@ -194,6 +202,18 @@ watch(() => route.params.id, load);
           <option v-for="p in filteredProjects" :key="p.id" :value="p.id">{{ p.name }}</option>
         </select>
       </div>
+    </div>
+
+    <div v-if="allRoadmaps.length || draft.roadmap_id" class="card flex flex-col sm:flex-row sm:items-end gap-3">
+      <div class="flex-1">
+        <label class="label" for="m-roadmap">Roadmap</label>
+        <select id="m-roadmap" v-model="draft.roadmap_id" class="input">
+          <option :value="null">— none —</option>
+          <option v-for="r in allRoadmaps" :key="r.id" :value="r.id">{{ r.title }}</option>
+        </select>
+        <p class="text-xs text-slate-warm mt-1.5">Link the plan you'll walk through — jump to its steps from here.</p>
+      </div>
+      <button v-if="draft.roadmap_id" @click="openRoadmap" class="btn-primary text-sm shrink-0 whitespace-nowrap">View roadmap →</button>
     </div>
 
     <div class="border-b border-sand flex items-center gap-1 overflow-x-auto">
