@@ -56,6 +56,7 @@ router.put('/:id', async (req, res, next) => {
     if ('progress' in body) add('progress', Math.max(0, Math.min(100, Math.round(Number(body.progress) || 0))));
     if ('sort_order' in body && body.sort_order != null) add('sort_order', body.sort_order);
     if ('project_id' in body) add('project_id', body.project_id || null);
+    if ('phase_noun' in body) add('phase_noun', String(body.phase_noun || '').trim().slice(0, 24) || 'Phase');
 
     if (!sets.length) {
       const cur = await query('SELECT * FROM ideas WHERE id = $1 AND workspace_id = $2', [req.params.id, req.workspaceId]);

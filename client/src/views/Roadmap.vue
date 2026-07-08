@@ -66,6 +66,21 @@ function phaseState(p) {
   return 'upcoming';
 }
 const PHASE_LABEL = { done: 'Done', active: 'In progress', upcoming: 'Upcoming' };
+
+// Each roadmap chooses what to call its groups — "Phase", "Week", "Milestone"… —
+// so the numbered chips read "Week 1", "Week 2", etc. rather than a fixed "Phase".
+const noun = computed(() => (selected.value?.phase_noun || 'Phase').trim() || 'Phase');
+const nounLower = computed(() => noun.value.toLowerCase());
+const nounPlural = computed(() => noun.value + (/s$/i.test(noun.value) ? '' : 's'));
+const nounPluralLower = computed(() => nounPlural.value.toLowerCase());
+const UNIT_PRESETS = ['Phase', 'Week', 'Sprint', 'Milestone', 'Stage', 'Step', 'Part'];
+function setNoun(v) {
+  const idea = selected.value;
+  if (!idea) return;
+  const val = (v || '').trim().slice(0, 24) || 'Phase';
+  if (val === (idea.phase_noun || 'Phase')) return;
+  patch(idea, { phase_noun: val });
+}
 function phasePct(p) {
   const t = p.steps.length;
   return t ? Math.round((p.steps.filter((s) => s.done).length / t) * 100) : 0;
@@ -209,7 +224,7 @@ async function addPhase() {
     if (selected.value === idea && !phases.value.some((x) => x.id === p.id)) {
       phases.value.push(p); activePhaseId.value = p.id; scrollToActive();
     }
-  } catch { toast.error('Couldn’t add phase'); }
+  } catch { toast.error(`Couldn’t add ${nounLower.value}`); }
 }
 async function editPhase(p, body) {
   const prev = { title: p.title, note: p.note };
@@ -224,7 +239,7 @@ async function removePhase(p) {
   if (activePhaseId.value === p.id) activePhaseId.value = (phases.value[i] || phases.value[i - 1] || {}).id ?? null;
   const t = p.steps.length, d = p.steps.filter((s) => s.done).length;
   bumpCounts(idea, -t, -d);
-  try { await api.removePhase(p.id); toast.show('Phase removed', { kind: 'info', ttl: 4000 }); }
+  try { await api.removePhase(p.id); toast.show(`${noun.value} removed`, { kind: 'info', ttl: 4000 }); }
   catch {
     // Only restore into the live list if this idea is still open — otherwise the
     // stale phase would land on whatever idea the user has switched to.
@@ -357,6 +372,12 @@ onMounted(async () => {
   const q = Number(route.query.idea);
   if (q && items.value.some((i) => i.id === q)) selectedId.value = q;
 });
+// Belt-and-suspenders: if the ?idea= query changes while this view stays mounted
+// (re-opening a different plan from a meeting), open it without needing a remount.
+watch(() => route.query.idea, (v) => {
+  const q = Number(v);
+  if (q && selectedId.value !== q && items.value.some((i) => i.id === q)) selectedId.value = q;
+});
 onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof document !== 'undefined') document.documentElement.style.overflow = ''; });
 </script>
 
@@ -427,10 +448,24 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
                 />
                 <div class="fh-sub">
                   <span :class="['drill-badge', `tone-${stageOf(selected).tone}`]">{{ stageOf(selected).label }}</span>
-                  <span class="tabular-nums">{{ phasesDone }}/{{ phases.length }} phases · {{ stepStats.done }}/{{ stepStats.total }} steps · {{ stepStats.pct }}%</span>
+                  <span class="tabular-nums">{{ phasesDone }}/{{ phases.length }} {{ nounPluralLower }} · {{ stepStats.done }}/{{ stepStats.total }} steps · {{ stepStats.pct }}%</span>
                 </div>
               </div>
               <div class="fh-actions">
+                <div class="fh-unit" title="What to call each group — Phase, Week, Milestone…">
+                  <span class="fh-unit-lbl">Groups</span>
+                  <input
+                    class="fh-unit-input"
+                    :value="noun"
+                    @change="setNoun($event.target.value)"
+                    list="fh-unit-presets"
+                    spellcheck="false"
+                    aria-label="What to call each group (e.g. Phase, Week)"
+                  />
+                  <datalist id="fh-unit-presets">
+                    <option v-for="u in UNIT_PRESETS" :key="u" :value="u" />
+                  </datalist>
+                </div>
                 <button class="fh-export" :class="{ open: exportOpen }" @click="exportOpen = !exportOpen" aria-haspopup="true" :aria-expanded="exportOpen">Export ▾</button>
                 <div v-if="exportOpen" class="fh-export-back" @click="exportOpen = false" />
                 <div v-if="exportOpen" class="fh-export-menu">
@@ -465,13 +500,13 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
                     <button type="button" class="pmove" @click.stop="movePhase(p, 1)" :disabled="pi === phases.length - 1" aria-label="Move phase down" title="Move down">↓</button>
                     <span class="pcard-grip" @click.stop title="Drag to reorder">⠿</span>
                   </div>
-                  <div class="pcard-idx">Phase {{ pi + 1 }}</div>
+                  <div class="pcard-idx">{{ noun }} {{ pi + 1 }}</div>
                   <input
                     class="pcard-title"
                     :value="p.title"
                     @change="editPhase(p, { title: $event.target.value })"
                     @click.stop @mousedown.stop
-                    placeholder="Name this phase…"
+                    :placeholder="`Name this ${nounLower}…`"
                   />
                   <div class="pcard-foot">
                     <span class="pcard-count tabular-nums" v-if="p.steps.length">{{ p.steps.filter((s) => s.done).length }}/{{ p.steps.length }}</span>
@@ -482,7 +517,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
               </VueDraggable>
 
               <form class="pcard add" @submit.prevent="addPhase">
-                <div class="pcard-idx">＋ New phase</div>
+                <div class="pcard-idx">＋ New {{ nounLower }}</div>
                 <input v-model="newPhase" placeholder="Now, Next, Launch…" />
               </form>
             </aside>
@@ -500,7 +535,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
                   <div class="titem-main">
                     <button class="titem-head" @click="selectPhase(p)">
                       <span class="titem-n tabular-nums">{{ pi + 1 }}</span>
-                      <span class="titem-title">{{ p.title || 'Untitled phase' }}</span>
+                      <span class="titem-title">{{ p.title || ('Untitled ' + nounLower) }}</span>
                       <span class="titem-count tabular-nums" v-if="p.steps.length">{{ p.steps.filter((s) => s.done).length }}/{{ p.steps.length }}</span>
                       <span class="ppill" :class="phaseState(p)">{{ PHASE_LABEL[phaseState(p)] }}</span>
                       <span class="titem-chev" aria-hidden="true">▸</span>
@@ -548,7 +583,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
                   </div>
                 </div>
 
-                <p v-if="!phases.length" class="tline-empty">No phases yet — add the first one on the left to start the plan.</p>
+                <p v-if="!phases.length" class="tline-empty">No {{ nounPluralLower }} yet — add the first one on the left to start the plan.</p>
               </div>
 
               <footer class="focus-foot">
@@ -660,7 +695,11 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 .fh-bar .fill { background: rgb(var(--c-terracotta)); }
 
 /* export menu — theme-adaptive, matches the focus view */
-.fh-actions { position: relative; flex-shrink: 0; margin-top: 0.15rem; }
+.fh-actions { position: relative; flex-shrink: 0; margin-top: 0.15rem; display: flex; align-items: center; gap: 0.5rem; }
+.fh-unit { display: flex; align-items: center; gap: 0.4rem; }
+.fh-unit-lbl { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgb(var(--c-slate-warm) / 0.7); }
+.fh-unit-input { width: 5.75rem; padding: 0.45rem 0.55rem; border-radius: 0.6rem; font-size: 0.8rem; color: rgb(var(--c-ink)); background: transparent; border: 1px solid rgb(var(--c-sand)); transition: border-color .15s, color .15s; }
+.fh-unit-input:hover, .fh-unit-input:focus { border-color: rgb(var(--c-terracotta) / 0.45); color: rgb(var(--c-terracotta)); outline: none; }
 .fh-export { padding: 0.45rem 0.8rem; border-radius: 0.6rem; font-size: 0.8rem; color: rgb(var(--c-slate-warm)); border: 1px solid rgb(var(--c-sand)); white-space: nowrap; transition: color .15s, border-color .15s; }
 .fh-export:hover, .fh-export.open { color: rgb(var(--c-terracotta)); border-color: rgb(var(--c-terracotta) / 0.45); }
 .fh-export-back { position: fixed; inset: 0; z-index: 30; }
