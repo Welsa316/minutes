@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter, RouterLink } from 'vue-router';
+import { pushWithoutTransition } from '../router/index.js';
 import { meetings, clients, projects, ideas } from '../api/endpoints.js';
 import TiptapEditor from '../components/TiptapEditor.vue';
 import NoteBoard from '../components/NoteBoard.vue';
@@ -131,7 +132,10 @@ async function destroy() {
 }
 
 function openRoadmap() {
-  if (draft.value?.roadmap_id) router.push({ name: 'roadmap', query: { idea: draft.value.roadmap_id } });
+  // Skip the View Transitions cross-fade: in some WebViews (incl. the installed
+  // macOS PWA) it can leave a frozen snapshot over the app, so the roadmap looks
+  // like it never opened. The workspace portal dodges the same issue this way.
+  if (draft.value?.roadmap_id) pushWithoutTransition({ name: 'roadmap', query: { idea: draft.value.roadmap_id } });
 }
 
 function toLocalInput(iso) {
