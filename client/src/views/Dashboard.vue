@@ -8,6 +8,7 @@ import { House, Plus, CalendarDays, StickyNote, Users, FolderKanban, TrendingUp,
 import Skeleton from '../components/Skeleton.vue';
 import CountUp from '../components/CountUp.vue';
 import ClientChip from '../components/ClientChip.vue';
+import bgUrl from '../assets/dashboard-bg.jpg';
 
 const auth = useAuthStore();
 const ws = useWorkspaceStore();
@@ -161,7 +162,7 @@ onMounted(load);
 </script>
 
 <template>
-  <div class="dash">
+  <div class="dash" :style="{ '--dash-img': `url(${bgUrl})` }">
     <div class="dash-bg" aria-hidden="true"></div>
     <!-- shared gradient defs for the charts -->
     <svg width="0" height="0" class="absolute" aria-hidden="true"><defs>
@@ -340,10 +341,12 @@ onMounted(load);
 .dash { position: relative; min-height: calc(100dvh - 7rem); color: #f4f1ec; }
 .dash-bg {
   position: absolute; inset: -1rem; z-index: 0; pointer-events: none; overflow: hidden;
+  /* layers, top → bottom: faint brand glows · dark mute veil · the artwork · base */
   background:
-    radial-gradient(115% 85% at 12% -10%, rgba(232, 118, 62, 0.20), transparent 52%),
-    radial-gradient(95% 75% at 102% 108%, rgba(53, 211, 198, 0.16), transparent 55%),
-    radial-gradient(70% 55% at 62% 38%, rgba(60, 74, 104, 0.35), transparent 72%),
+    radial-gradient(115% 85% at 12% -10%, rgba(232, 118, 62, 0.14), transparent 52%),
+    radial-gradient(95% 75% at 102% 108%, rgba(53, 211, 198, 0.10), transparent 55%),
+    linear-gradient(180deg, rgba(9, 12, 20, 0.62) 0%, rgba(8, 11, 17, 0.42) 45%, rgba(6, 8, 16, 0.6) 100%),
+    var(--dash-img, none) center / cover no-repeat,
     linear-gradient(158deg, #0c111a 0%, #080b11 60%, #060810 100%);
 }
 @media (min-width: 640px) { .dash-bg { inset: -1.5rem; } }
