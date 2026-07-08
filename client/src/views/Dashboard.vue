@@ -340,11 +340,16 @@ onMounted(load);
 .dash { position: relative; min-height: calc(100dvh - 7rem); color: #f4f1ec; }
 .dash-bg {
   position: absolute; inset: -1rem; z-index: 0; pointer-events: none; overflow: hidden;
-  /* layers, top → bottom: edge vignette · faint warm depth · crisp grid · base navy */
+  /* soft glow blooms scattered irregularly across the field, over the navy base */
   background:
-    radial-gradient(125% 100% at 50% 32%, transparent 56%, rgba(3, 5, 10, 0.5)),
-    radial-gradient(85% 55% at 84% -12%, rgba(232, 118, 62, 0.07), transparent 55%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Cpath d='M48 0H0V48' fill='none' stroke='%23ffffff' stroke-opacity='0.035' stroke-width='1'/%3E%3C/svg%3E") repeat,
+    radial-gradient(38% 34% at 10% 6%,  rgba(232, 118, 62, 0.13), transparent 62%),
+    radial-gradient(34% 32% at 82% 12%, rgba(72, 104, 146, 0.16), transparent 62%),
+    radial-gradient(30% 30% at 57% 40%, rgba(232, 118, 62, 0.09), transparent 60%),
+    radial-gradient(36% 34% at 26% 58%, rgba(66, 110, 132, 0.14), transparent 62%),
+    radial-gradient(40% 36% at 92% 66%, rgba(232, 118, 62, 0.12), transparent 62%),
+    radial-gradient(34% 34% at 47% 92%, rgba(70, 120, 140, 0.13), transparent 62%),
+    radial-gradient(30% 30% at 6% 85%,  rgba(232, 118, 62, 0.10), transparent 60%),
+    radial-gradient(30% 30% at 70% 88%, rgba(80, 100, 150, 0.12), transparent 62%),
     linear-gradient(160deg, #0c111a 0%, #090d15 55%, #070a11 100%);
 }
 @media (min-width: 640px) { .dash-bg { inset: -1.5rem; } }
