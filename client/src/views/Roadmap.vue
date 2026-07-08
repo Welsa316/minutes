@@ -743,7 +743,8 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 .scheck.ghost { border-style: dashed; color: rgb(var(--c-slate-warm)); font-size: 0.85rem; }
 .slabel { flex: 1; min-width: 0; background: transparent; border: 0; font-size: 0.92rem; color: rgb(var(--c-ink)); padding: 0.2rem 0.25rem; border-radius: 0.3rem; }
 .slabel:focus { outline: none; background: rgb(var(--c-sand) / 0.4); }
-.slabel.done { color: rgb(var(--c-slate-warm)); text-decoration: line-through; }
+/* checked = greyed out (still fully readable); the terracotta check is the marker */
+.slabel.done { color: rgb(var(--c-slate-warm) / 0.7); }
 .smove { color: rgb(var(--c-slate-warm) / 0.55); font-size: 0.7rem; line-height: 1; padding: 0 1px; opacity: 0; transition: opacity .15s; }
 .step:hover .smove, .step:focus-within .smove { opacity: 1; }
 .step:hover .smove:disabled, .step:focus-within .smove:disabled { opacity: 0.25; }
