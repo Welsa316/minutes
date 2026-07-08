@@ -28,7 +28,9 @@ const WIDGETS = [
   { id: 'bars', label: 'Bars' },
   { id: 'linear', label: 'Linear' },
 ];
-const WKEY = 'minutes:dashboard-widgets';
+// Per-workspace: the dashboard re-mounts on workspace switch (its :key includes
+// the active id), so reading this at setup gives each workspace its own choice.
+const WKEY = `minutes:dashboard-widgets:${ws.activeId ?? 'default'}`;
 const savedWidgets = (() => { try { return JSON.parse(localStorage.getItem(WKEY)) || {}; } catch { return {}; } })();
 const visible = reactive(Object.fromEntries(WIDGETS.map((w) => [w.id, savedWidgets[w.id] !== false])));
 watch(visible, (v) => { try { localStorage.setItem(WKEY, JSON.stringify(v)); } catch {} }, { deep: true });
