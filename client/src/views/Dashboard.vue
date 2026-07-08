@@ -1,10 +1,10 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { dashboard } from '../api/endpoints.js';
 import { useAuthStore } from '../stores/auth.js';
 import { useWorkspaceStore } from '../stores/workspace.js';
-import { House, Plus, CalendarDays, StickyNote, Users, FolderKanban, TrendingUp, Activity, ArrowUpRight, Info } from 'lucide-vue-next';
+import { House, Plus, CalendarDays, StickyNote, Users, FolderKanban, TrendingUp, Activity, ArrowUpRight, Info, SlidersHorizontal } from 'lucide-vue-next';
 import Skeleton from '../components/Skeleton.vue';
 import CountUp from '../components/CountUp.vue';
 import ClientChip from '../components/ClientChip.vue';
@@ -14,6 +14,30 @@ const ws = useWorkspaceStore();
 const router = useRouter();
 
 function goHome() { router.push('/home'); }
+
+// --- customizable cards: which widgets show, persisted per browser ---
+const WIDGETS = [
+  { id: 'meetings', label: 'Meetings' },
+  { id: 'thisMonth', label: 'This month' },
+  { id: 'momentum', label: 'Momentum' },
+  { id: 'activity', label: 'Activity chart' },
+  { id: 'comingUp', label: 'Coming up' },
+  { id: 'glance', label: 'At a glance' },
+  { id: 'week', label: 'This week' },
+  { id: 'recent', label: 'Recent meetings' },
+  { id: 'bars', label: 'Bars' },
+  { id: 'linear', label: 'Linear' },
+];
+const WKEY = 'minutes:dashboard-widgets';
+const savedWidgets = (() => { try { return JSON.parse(localStorage.getItem(WKEY)) || {}; } catch { return {}; } })();
+const visible = reactive(Object.fromEntries(WIDGETS.map((w) => [w.id, savedWidgets[w.id] !== false])));
+watch(visible, (v) => { try { localStorage.setItem(WKEY, JSON.stringify(v)); } catch {} }, { deep: true });
+const on = (id) => visible[id];
+function toggleWidget(id) { visible[id] = !visible[id]; }
+function resetWidgets() { for (const w of WIDGETS) visible[w.id] = true; }
+const showCustomize = ref(false);
+const anyVisible = computed(() => WIDGETS.some((w) => visible[w.id]));
+const anyMini = computed(() => visible.bars || visible.linear);
 
 const upcoming = ref([]);
 const active = ref([]);
@@ -181,14 +205,32 @@ onMounted(load);
         <h1 class="dash-greet">{{ greeting }}</h1>
         <p class="dash-date">{{ dateLine }}</p>
       </div>
-      <RouterLink to="/meetings/new" class="dash-cta"><Plus class="h-4 w-4" :stroke-width="2.4" /> New meeting</RouterLink>
+      <div class="dash-actions">
+        <div class="cust-wrap">
+          <button class="dash-cog" :class="{ open: showCustomize }" @click="showCustomize = !showCustomize" title="Customize cards" aria-label="Customize cards" aria-haspopup="true" :aria-expanded="showCustomize">
+            <SlidersHorizontal class="h-4 w-4" :stroke-width="2" />
+          </button>
+          <div v-if="showCustomize" class="cust-back" @click="showCustomize = false" />
+          <div v-if="showCustomize" class="cust-panel">
+            <div class="cust-head"><span>Cards</span><button class="cust-reset" @click="resetWidgets">Reset</button></div>
+            <button
+              v-for="w in WIDGETS" :key="w.id" type="button" class="cust-row"
+              role="switch" :aria-checked="visible[w.id]" @click="toggleWidget(w.id)"
+            >
+              <span class="cust-label">{{ w.label }}</span>
+              <span class="switch" :class="{ on: visible[w.id] }"><span class="knob" /></span>
+            </button>
+          </div>
+        </div>
+        <RouterLink to="/meetings/new" class="dash-cta"><Plus class="h-4 w-4" :stroke-width="2.4" /> New meeting</RouterLink>
+      </div>
     </header>
 
     <Skeleton v-if="loading" variant="dashboard" />
 
     <div v-else class="bento">
       <!-- ROW 1 — stat cards -->
-      <div class="gcard c-span4 stat">
+      <div v-if="on('meetings')" class="gcard c-span4 stat">
         <div class="stat-head"><span class="chip chip-orange"><CalendarDays class="h-3.5 w-3.5" /></span> Meetings</div>
         <div class="stat-row">
           <div class="stat-num"><CountUp :value="totals.meetings" /></div>
@@ -199,7 +241,7 @@ onMounted(load);
         </svg>
       </div>
 
-      <div class="gcard c-span4 stat">
+      <div v-if="on('thisMonth')" class="gcard c-span4 stat">
         <div class="stat-head"><span class="chip chip-teal"><TrendingUp class="h-3.5 w-3.5" /></span> This month</div>
         <div class="stat-row">
           <div class="stat-num"><CountUp :value="thisMonth" /></div>
@@ -210,7 +252,7 @@ onMounted(load);
         </svg>
       </div>
 
-      <div class="gcard c-span4 gauge-card">
+      <div v-if="on('momentum')" class="gcard c-span4 gauge-card">
         <div class="stat-head"><span class="chip chip-orange"><Activity class="h-3.5 w-3.5" /></span> Momentum</div>
         <svg viewBox="0 0 220 150" class="gauge-arc">
           <path :d="momentumTrack" stroke="rgba(255,255,255,0.08)" stroke-width="14" fill="none" stroke-linecap="round" />
@@ -222,7 +264,7 @@ onMounted(load);
       </div>
 
       <!-- ROW 2 — big chart + coming up -->
-      <div class="gcard c-span8 chart-card">
+      <div v-if="on('activity')" class="gcard c-span8 chart-card">
         <div class="chart-top">
           <div>
             <div class="chart-title">Activity <span class="muted">· meetings logged</span></div>
@@ -250,7 +292,7 @@ onMounted(load);
         </div>
       </div>
 
-      <div class="gcard c-span4 up-card">
+      <div v-if="on('comingUp')" class="gcard c-span4 up-card">
         <div class="stat-head between"><span><span class="chip chip-orange"><CalendarDays class="h-3.5 w-3.5" /></span> Coming up</span><RouterLink to="/meetings" class="link">All →</RouterLink></div>
         <ul v-if="upcoming.length" class="up-list">
           <li v-for="m in upcoming.slice(0, 5)" :key="m.id">
@@ -268,7 +310,7 @@ onMounted(load);
       </div>
 
       <!-- ROW 3 — at a glance, week gauge, recent table, mini charts -->
-      <div class="gcard c-span3 glance">
+      <div v-if="on('glance')" class="gcard c-span3 glance">
         <div class="stat-head between"><span><span class="chip chip-orange">$</span> At a glance</span><RouterLink to="/clients" class="link"><ArrowUpRight class="h-3.5 w-3.5" /></RouterLink></div>
         <div class="glance-big"><CountUp :value="totals.meetings" /> <span class="muted">meetings</span></div>
         <ul class="glance-list">
@@ -282,7 +324,7 @@ onMounted(load);
         </ul>
       </div>
 
-      <div class="gcard c-span3 gauge-card">
+      <div v-if="on('week')" class="gcard c-span3 gauge-card">
         <div class="stat-head between"><span>This week</span><Info class="h-3.5 w-3.5 muted" /></div>
         <svg viewBox="0 0 200 120" class="needle-svg">
           <path :d="weekTrack" stroke="rgba(255,255,255,0.08)" stroke-width="12" fill="none" stroke-linecap="round" />
@@ -294,7 +336,7 @@ onMounted(load);
         <div class="needle-foot"><span class="muted">meetings in the next 7 days</span></div>
       </div>
 
-      <div class="gcard c-span4 table-card">
+      <div v-if="on('recent')" class="gcard c-span4 table-card">
         <div class="thead"><span>Name</span><span>Client</span><span>When</span></div>
         <ul v-if="upcoming.length" class="trows">
           <li v-for="m in upcoming.slice(0, 5)" :key="m.id">
@@ -308,8 +350,8 @@ onMounted(load);
         <p v-else class="empty">No upcoming meetings.</p>
       </div>
 
-      <div class="c-span2 mini-col">
-        <div class="gcard mini">
+      <div v-if="anyMini" class="c-span2 mini-col">
+        <div v-if="on('bars')" class="gcard mini">
           <div class="mini-head">Bars</div>
           <div class="mini-row"><b><CountUp :value="avgPerMonth" /></b><span class="delta" :class="meetingsDelta >= 0 ? 'up' : 'down'">{{ meetingsDelta >= 0 ? '+' : '' }}{{ meetingsDelta }}%</span></div>
           <div class="mini-sub muted">avg / month</div>
@@ -317,7 +359,7 @@ onMounted(load);
             <rect v-for="(c, i) in barsSeries" :key="i" :x="i * (140 / barsSeries.length) + 2" :y="34 - Math.max(3, (c / maxCandle) * 32)" :width="140 / barsSeries.length - 4" :height="Math.max(3, (c / maxCandle) * 32)" rx="2" fill="#35d3c6" :opacity="0.4 + 0.6 * (c / maxCandle)" />
           </svg>
         </div>
-        <div class="gcard mini">
+        <div v-if="on('linear')" class="gcard mini">
           <div class="mini-head">Linear</div>
           <div class="mini-row"><b><CountUp :value="totals.meetings" /></b><span class="delta up">total</span></div>
           <div class="mini-sub muted">all-time meetings</div>
@@ -327,6 +369,8 @@ onMounted(load);
           </svg>
         </div>
       </div>
+
+      <p v-if="!anyVisible" class="dash-empty">Every card is hidden — open <SlidersHorizontal class="inline h-4 w-4 -mt-0.5" :stroke-width="2" /> Customize to add some back.</p>
     </div>
 
     <button @click="goHome" title="Back to workspaces" class="dash-home"><House class="h-5 w-5" :stroke-width="1.9" /></button>
@@ -361,7 +405,7 @@ onMounted(load);
 }
 .dash > *:not(.dash-bg) { position: relative; z-index: 1; }
 
-.dash-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+.dash > header.dash-head { position: relative; z-index: 20; display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
 .dash-greet { font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1.75rem; line-height: 1.1; color: #fff; }
 .dash-date { font-size: 0.82rem; color: #97a0b0; margin-top: 0.35rem; }
 .dash-cta {
@@ -372,7 +416,32 @@ onMounted(load);
 }
 .dash-cta:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(226, 102, 44, 0.45); }
 
-.bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; align-items: stretch; }
+/* customize cards */
+.dash-actions { display: flex; align-items: center; gap: 0.6rem; }
+.cust-wrap { position: relative; }
+.dash-cog { width: 2.5rem; height: 2.5rem; display: grid; place-items: center; border-radius: 0.7rem; color: #97a0b0; background: rgba(16, 20, 28, 0.62); border: 1px solid rgba(255, 255, 255, 0.08); transition: color .15s, border-color .15s; }
+.dash-cog:hover, .dash-cog.open { color: #ef8747; border-color: rgba(239, 135, 71, 0.4); }
+.cust-back { position: fixed; inset: 0; z-index: 30; }
+.cust-panel {
+  position: absolute; top: calc(100% + 0.5rem); right: 0; z-index: 31; width: 15rem;
+  background: rgba(18, 22, 30, 0.94); backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.9rem; padding: 0.5rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+.cust-head { display: flex; align-items: center; justify-content: space-between; padding: 0.35rem 0.5rem 0.5rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7484; }
+.cust-reset { font-size: 0.72rem; text-transform: none; letter-spacing: 0; color: #97a0b0; }
+.cust-reset:hover { color: #ef8747; }
+.cust-row { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0.5rem; border-radius: 0.55rem; text-align: left; transition: background .12s; }
+.cust-row:hover { background: rgba(255, 255, 255, 0.05); }
+.cust-label { font-size: 0.86rem; color: #e7eaf0; }
+.switch { width: 2rem; height: 1.15rem; border-radius: 999px; background: rgba(255, 255, 255, 0.12); position: relative; transition: background .18s; flex-shrink: 0; }
+.switch.on { background: linear-gradient(180deg, #ef8747, #e2662c); }
+.switch .knob { position: absolute; top: 2px; left: 2px; width: calc(1.15rem - 4px); height: calc(1.15rem - 4px); border-radius: 50%; background: #fff; transition: transform .18s; }
+.switch.on .knob { transform: translateX(calc(2rem - 1.15rem)); }
+.dash-empty { grid-column: span 12; text-align: center; color: #6b7484; padding: 3rem 1rem; font-size: 0.92rem; }
+@media (prefers-reduced-motion: reduce) { .dash-cog, .switch, .switch .knob { transition: none; } }
+
+.bento { display: grid; grid-template-columns: repeat(12, 1fr); grid-auto-flow: row dense; gap: 1rem; align-items: stretch; }
 .c-span4 { grid-column: span 12; } .c-span8 { grid-column: span 12; }
 .c-span3 { grid-column: span 12; } .c-span2 { grid-column: span 12; }
 @media (min-width: 700px) { .c-span4 { grid-column: span 6; } .c-span3 { grid-column: span 6; } .c-span2 { grid-column: span 6; } }
