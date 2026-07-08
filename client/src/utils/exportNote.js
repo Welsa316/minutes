@@ -74,6 +74,48 @@ export function downloadFile(filename, content, mime = 'text/plain;charset=utf-8
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// Print an HTML document via a hidden same-page iframe rather than
+// window.open('', '_blank'). In an installed / standalone PWA, opening an
+// about:blank window gets handed to the OS, which has no handler for it
+// ("no application set to open the URL about:blank"). An iframe keeps everything
+// in-page and still raises the native print / Save-as-PDF dialog. Falls back to
+// downloading the HTML if the engine can't print.
+export function printHtml(html, fallbackFilename = 'export.html') {
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;';
+  document.body.appendChild(iframe);
+
+  const cw = iframe.contentWindow;
+  let printed = false;
+  const cleanup = () => { try { iframe.remove(); } catch { /* already gone */ } };
+
+  const fire = () => {
+    if (printed) return;
+    printed = true;
+    try {
+      cw.focus();
+      cw.addEventListener('afterprint', () => setTimeout(cleanup, 200));
+      cw.print();
+      setTimeout(cleanup, 60000); // backstop if afterprint never fires
+    } catch {
+      cleanup();
+      downloadFile(fallbackFilename, html, 'text/html;charset=utf-8');
+    }
+  };
+
+  const doc = cw.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  // The document is fully inline (images are pre-inlined), so it lays out
+  // synchronously; the load handler covers engines that need it, the timeout is
+  // the fallback.
+  iframe.addEventListener('load', () => setTimeout(fire, 50));
+  setTimeout(fire, 300);
+}
+
 export async function noteToMarkdown(note, { inline = true } = {}) {
   let html = note.body || '';
   if (inline) html = await inlineImages(html);
@@ -145,12 +187,7 @@ export async function exportNoteHtml(note) {
 
 export async function printNote(note) {
   const html = await noteToHtmlDoc(note);
-  const w = window.open('', '_blank');
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 350);
+  printHtml(html, `${slugify(note.title)}.html`);
 }
 
 // Combine many notes into one Markdown file.

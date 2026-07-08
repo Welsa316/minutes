@@ -1,4 +1,4 @@
-import { downloadFile } from './exportNote.js';
+import { downloadFile, printHtml } from './exportNote.js';
 
 function slug(s) {
   return (s || 'roadmap').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'roadmap';
@@ -10,16 +10,24 @@ function counts(phases) {
   return { total, done, pct: total ? Math.round((done / total) * 100) : 0 };
 }
 
+// A roadmap can rename its groups (Phase → Week, Milestone…); the export follows
+// that label just like the on-screen chips do.
+function labels(idea) {
+  const one = (String(idea?.phase_noun || 'Phase').trim() || 'Phase').toLowerCase();
+  return { one, many: one + (/s$/.test(one) ? '' : 's') };
+}
+
 // A roadmap → GitHub-flavoured Markdown: title, pitch, then each phase as a
 // heading with its brief (blockquote) and its steps as checkboxes; a step's
 // detail note is indented beneath it.
 export function roadmapToMarkdown(idea, phases) {
   const c = counts(phases);
+  const L = labels(idea);
   const out = [`# ${idea.title || 'Roadmap'}`, ''];
   if (idea.note) out.push(idea.note.trim(), '');
-  out.push(`*${phases.length} phase${phases.length === 1 ? '' : 's'} · ${c.done}/${c.total} steps · ${c.pct}% complete*`, '');
+  out.push(`*${phases.length} ${phases.length === 1 ? L.one : L.many} · ${c.done}/${c.total} steps · ${c.pct}% complete*`, '');
   phases.forEach((p, i) => {
-    out.push(`## ${i + 1}. ${p.title || 'Untitled phase'}`, '');
+    out.push(`## ${i + 1}. ${p.title || ('Untitled ' + L.one)}`, '');
     if (p.note) out.push(p.note.trim().split('\n').map((l) => `> ${l}`).join('\n'), '');
     for (const s of p.steps) {
       out.push(`- [${s.done ? 'x' : ' '}] ${s.label || ''}`);
@@ -37,11 +45,12 @@ function esc(s) {
 // A printable HTML document (used for Print / Save-as-PDF).
 export function roadmapToHtml(idea, phases) {
   const c = counts(phases);
+  const L = labels(idea);
   const body = phases.map((p, i) => {
     const steps = p.steps.map((s) =>
       `<li class="${s.done ? 'done' : ''}"><span class="box">${s.done ? '&#10003;' : ''}</span><span class="lbl">${esc(s.label)}</span>${s.note ? `<div class="note">${esc(s.note)}</div>` : ''}</li>`,
     ).join('');
-    return `<section><h2><span class="n">${i + 1}</span> ${esc(p.title || 'Untitled phase')}</h2>${p.note ? `<blockquote>${esc(p.note)}</blockquote>` : ''}<ul>${steps || '<li class="empty">No steps yet.</li>'}</ul></section>`;
+    return `<section><h2><span class="n">${i + 1}</span> ${esc(p.title || ('Untitled ' + L.one))}</h2>${p.note ? `<blockquote>${esc(p.note)}</blockquote>` : ''}<ul>${steps || '<li class="empty">No steps yet.</li>'}</ul></section>`;
   }).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(idea.title)}</title>
 <style>
@@ -65,7 +74,7 @@ export function roadmapToHtml(idea, phases) {
 </style></head><body>
   <h1>${esc(idea.title || 'Roadmap')}</h1>
   ${idea.note ? `<p class="pitch">${esc(idea.note)}</p>` : ''}
-  <p class="summary">${phases.length} phase${phases.length === 1 ? '' : 's'} · ${c.done}/${c.total} steps · ${c.pct}% complete</p>
+  <p class="summary">${phases.length} ${phases.length === 1 ? L.one : L.many} · ${c.done}/${c.total} steps · ${c.pct}% complete</p>
   ${body}
 </body></html>`;
 }
@@ -79,10 +88,5 @@ export async function copyRoadmapMarkdown(idea, phases) {
 }
 
 export function printRoadmap(idea, phases) {
-  const w = window.open('', '_blank');
-  if (!w) throw new Error('popup blocked');
-  w.document.write(roadmapToHtml(idea, phases));
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 300);
+  printHtml(roadmapToHtml(idea, phases), `${slug(idea.title)}.html`);
 }
