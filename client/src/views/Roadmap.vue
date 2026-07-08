@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { ideas as api, projects as projectsApi } from '../api/endpoints.js';
 import Skeleton from '../components/Skeleton.vue';
+import AnimatedCheck from '../components/AnimatedCheck.vue';
 import { useToastStore } from '../stores/toast.js';
 
 const toast = useToastStore();
@@ -488,8 +489,8 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
                           <div v-for="(s, si) in p.steps" :key="s.id" class="step">
                             <div class="step-row">
                               <span class="sgrip" title="Drag to reorder">⠿</span>
-                              <button type="button" class="scheck" :class="{ on: s.done }" @click="toggleStep(p, s)" :aria-label="s.done ? 'Mark not done' : 'Mark done'">
-                                <svg v-if="s.done" viewBox="0 0 24 24" class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                              <button type="button" class="acheck-btn" :class="{ on: s.done }" role="checkbox" :aria-checked="s.done" @click="toggleStep(p, s)" :aria-label="s.done ? 'Mark not done' : 'Mark done'">
+                                <AnimatedCheck :checked="s.done" :size="20" />
                               </button>
                               <input :value="s.label" @change="editStep(s, $event.target.value)" :class="['slabel', { done: s.done }]" />
                               <button type="button" class="smove" @click="moveStep(p, s, -1)" :disabled="si === 0" aria-label="Move step up" title="Move up">↑</button>
@@ -725,6 +726,10 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 @keyframes stepIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .sgrip { cursor: grab; color: rgb(var(--c-slate-warm) / 0.5); font-size: 0.8rem; line-height: 1; user-select: none; }
 .sgrip:active { cursor: grabbing; }
+/* animated draw checkbox: colour drives the SVG (currentColor) + transitions with state */
+.acheck-btn { flex-shrink: 0; display: grid; place-items: center; color: rgb(var(--c-slate-warm) / 0.5); transition: color .3s ease; }
+.acheck-btn.on { color: rgb(var(--c-terracotta)); }
+.acheck-btn:hover { color: rgb(var(--c-terracotta) / 0.75); }
 .scheck { width: 1.15rem; height: 1.15rem; border-radius: 0.35rem; flex-shrink: 0; border: 1.5px solid rgb(var(--c-sand)); display: grid; place-items: center; color: #fff; transition: background .15s, border-color .15s; }
 .scheck.on { background: rgb(var(--c-terracotta)); border-color: rgb(var(--c-terracotta)); }
 .scheck.ghost { border-style: dashed; color: rgb(var(--c-slate-warm)); font-size: 0.85rem; }

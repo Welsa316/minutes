@@ -5,6 +5,7 @@ import { useWorkspaceStore } from '../stores/workspace.js';
 import { useToastStore } from '../stores/toast.js';
 import Skeleton from '../components/Skeleton.vue';
 import MicButton from '../components/MicButton.vue';
+import AnimatedCheck from '../components/AnimatedCheck.vue';
 import { format, isToday, isYesterday } from 'date-fns';
 
 const ws = useWorkspaceStore();
@@ -244,7 +245,16 @@ async function destroy(t) {
               :key="t.id"
               :class="['flex items-center gap-3 py-1.5 group rounded px-2 -mx-2 hover:bg-sand/30 transition-colors', t._pending && 'opacity-60']"
             >
-              <input type="checkbox" :checked="t.done" @change="toggle(t)" class="h-4 w-4 rounded border-sand text-terracotta focus:ring-terracotta/40 shrink-0" />
+              <button
+                type="button"
+                role="checkbox"
+                :aria-checked="t.done"
+                @click="toggle(t)"
+                :aria-label="t.done ? 'Mark not done' : 'Mark done'"
+                :class="['shrink-0 grid place-items-center transition-colors', t.done ? 'text-terracotta' : 'text-slate-warm/50 hover:text-terracotta/70']"
+              >
+                <AnimatedCheck :checked="t.done" :size="18" />
+              </button>
               <input
                 :value="t.label"
                 @change="updateLabel(t, $event.target.value)"
@@ -290,7 +300,16 @@ async function destroy(t) {
               :key="t.id"
               class="flex items-center gap-3 py-1 group rounded px-2 -mx-2 hover:bg-sand/30 transition-colors"
             >
-              <input type="checkbox" :checked="t.done" @change="toggle(t)" class="h-4 w-4 rounded border-sand text-terracotta focus:ring-terracotta/40 shrink-0" />
+              <button
+                type="button"
+                role="checkbox"
+                :aria-checked="t.done"
+                @click="toggle(t)"
+                :aria-label="t.done ? 'Mark not done' : 'Mark done'"
+                :class="['shrink-0 grid place-items-center transition-colors', t.done ? 'text-terracotta' : 'text-slate-warm/50 hover:text-terracotta/70']"
+              >
+                <AnimatedCheck :checked="t.done" :size="18" />
+              </button>
               <input
                 :value="t.label"
                 @change="updateLabel(t, $event.target.value)"
