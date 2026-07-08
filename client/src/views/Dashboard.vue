@@ -8,7 +8,6 @@ import { House, Plus, CalendarDays, StickyNote, Users, FolderKanban, TrendingUp,
 import Skeleton from '../components/Skeleton.vue';
 import CountUp from '../components/CountUp.vue';
 import ClientChip from '../components/ClientChip.vue';
-import bgUrl from '../assets/dashboard-bg.jpg';
 
 const auth = useAuthStore();
 const ws = useWorkspaceStore();
@@ -162,7 +161,7 @@ onMounted(load);
 </script>
 
 <template>
-  <div class="dash" :style="{ '--dash-img': `url(${bgUrl})` }">
+  <div class="dash">
     <div class="dash-bg" aria-hidden="true"></div>
     <!-- shared gradient defs for the charts -->
     <svg width="0" height="0" class="absolute" aria-hidden="true"><defs>
@@ -341,13 +340,12 @@ onMounted(load);
 .dash { position: relative; min-height: calc(100dvh - 7rem); color: #f4f1ec; }
 .dash-bg {
   position: absolute; inset: -1rem; z-index: 0; pointer-events: none; overflow: hidden;
-  /* layers, top → bottom: faint brand glows · dark mute veil · the artwork · base */
+  /* layers, top → bottom: edge vignette · faint warm depth · crisp grid · base navy */
   background:
-    radial-gradient(115% 85% at 12% -10%, rgba(232, 118, 62, 0.14), transparent 52%),
-    radial-gradient(95% 75% at 102% 108%, rgba(53, 211, 198, 0.10), transparent 55%),
-    linear-gradient(180deg, rgba(9, 12, 20, 0.62) 0%, rgba(8, 11, 17, 0.42) 45%, rgba(6, 8, 16, 0.6) 100%),
-    var(--dash-img, none) center / cover no-repeat,
-    linear-gradient(158deg, #0c111a 0%, #080b11 60%, #060810 100%);
+    radial-gradient(125% 100% at 50% 32%, transparent 56%, rgba(3, 5, 10, 0.5)),
+    radial-gradient(85% 55% at 84% -12%, rgba(232, 118, 62, 0.07), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Cpath d='M48 0H0V48' fill='none' stroke='%23ffffff' stroke-opacity='0.035' stroke-width='1'/%3E%3C/svg%3E") repeat,
+    linear-gradient(160deg, #0c111a 0%, #090d15 55%, #070a11 100%);
 }
 @media (min-width: 640px) { .dash-bg { inset: -1.5rem; } }
 @media (min-width: 1024px) { .dash-bg { inset: -2rem; } }
