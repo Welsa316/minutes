@@ -206,6 +206,7 @@ onMounted(load);
         <p class="dash-date">{{ dateLine }}</p>
       </div>
       <div class="dash-actions">
+        <button @click="goHome" class="dash-cog" title="Back to workspaces" aria-label="Back to workspaces"><House class="h-4 w-4" :stroke-width="2" /></button>
         <div class="cust-wrap">
           <button class="dash-cog" :class="{ open: showCustomize }" @click="showCustomize = !showCustomize" title="Customize cards" aria-label="Customize cards" aria-haspopup="true" :aria-expanded="showCustomize">
             <SlidersHorizontal class="h-4 w-4" :stroke-width="2" />
@@ -372,8 +373,6 @@ onMounted(load);
 
       <p v-if="!anyVisible" class="dash-empty">Every card is hidden — open <SlidersHorizontal class="inline h-4 w-4 -mt-0.5" :stroke-width="2" /> Customize to add some back.</p>
     </div>
-
-    <button @click="goHome" title="Back to workspaces" class="dash-home"><House class="h-5 w-5" :stroke-width="1.9" /></button>
   </div>
 </template>
 
@@ -539,13 +538,5 @@ onMounted(load);
 .mini-sub { font-size: 0.68rem; }
 .mini-bars, .mini-line { width: 100%; height: 34px; margin-top: 0.45rem; }
 
-.dash-home {
-  position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 40; height: 2.75rem; width: 2.75rem; border-radius: 999px;
-  display: grid; place-items: center; color: #97a0b0;
-  background: rgba(16, 20, 28, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); transition: all .15s;
-}
-.dash-home:hover { color: #ef8747; border-color: rgba(239, 135, 71, 0.4); transform: translateY(-2px); }
-
-@media (prefers-reduced-motion: reduce) { .dash-cta, .up-cta, .dash-home { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .dash-cta, .up-cta { transition: none; } }
 </style>
