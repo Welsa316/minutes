@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router';
 import { ideas as api, projects as projectsApi } from '../api/endpoints.js';
 import Skeleton from '../components/Skeleton.vue';
 import AnimatedCheck from '../components/AnimatedCheck.vue';
+import { downloadRoadmapMarkdown, copyRoadmapMarkdown, printRoadmap } from '../utils/exportRoadmap.js';
 import { useToastStore } from '../stores/toast.js';
 
 const toast = useToastStore();
@@ -136,6 +137,19 @@ function onUp() { drag.down = false; }
 function onNodeClick(idea) { if (drag.moved) { drag.moved = false; return; } selectedId.value = idea.id; }
 
 function close() { selectedId.value = null; }
+
+// --- export the open roadmap (markdown / print) ---
+const exportOpen = ref(false);
+async function doExport(kind) {
+  exportOpen.value = false;
+  const idea = selected.value;
+  if (!idea) return;
+  try {
+    if (kind === 'copy') { await copyRoadmapMarkdown(idea, phases.value); toast.success('Copied to clipboard'); }
+    else if (kind === 'md') downloadRoadmapMarkdown(idea, phases.value);
+    else if (kind === 'print') printRoadmap(idea, phases.value);
+  } catch { toast.error('Export failed'); }
+}
 
 // --- the plan: phases + their steps (loaded when an idea is focused) ---
 let phasesReq = 0;
@@ -416,6 +430,15 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
                   <span class="tabular-nums">{{ phasesDone }}/{{ phases.length }} phases · {{ stepStats.done }}/{{ stepStats.total }} steps · {{ stepStats.pct }}%</span>
                 </div>
               </div>
+              <div class="fh-actions">
+                <button class="fh-export" :class="{ open: exportOpen }" @click="exportOpen = !exportOpen" aria-haspopup="true" :aria-expanded="exportOpen">Export ▾</button>
+                <div v-if="exportOpen" class="fh-export-back" @click="exportOpen = false" />
+                <div v-if="exportOpen" class="fh-export-menu">
+                  <button type="button" @click="doExport('copy')">Copy as Markdown</button>
+                  <button type="button" @click="doExport('md')">Download .md</button>
+                  <button type="button" @click="doExport('print')">Print / PDF</button>
+                </div>
+              </div>
             </div>
             <div class="fh-bar"><span class="fill" :style="{ width: stepStats.pct + '%' }" /></div>
           </header>
@@ -635,6 +658,15 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 .fh-sub { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.4rem; font-size: 0.8rem; color: rgb(var(--c-slate-warm)); }
 .fh-bar { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: rgb(var(--c-sand)); }
 .fh-bar .fill { background: rgb(var(--c-terracotta)); }
+
+/* export menu — theme-adaptive, matches the focus view */
+.fh-actions { position: relative; flex-shrink: 0; margin-top: 0.15rem; }
+.fh-export { padding: 0.45rem 0.8rem; border-radius: 0.6rem; font-size: 0.8rem; color: rgb(var(--c-slate-warm)); border: 1px solid rgb(var(--c-sand)); white-space: nowrap; transition: color .15s, border-color .15s; }
+.fh-export:hover, .fh-export.open { color: rgb(var(--c-terracotta)); border-color: rgb(var(--c-terracotta) / 0.45); }
+.fh-export-back { position: fixed; inset: 0; z-index: 30; }
+.fh-export-menu { position: absolute; top: calc(100% + 0.4rem); right: 0; z-index: 31; min-width: 12rem; background: rgb(var(--c-surface)); border: 1px solid rgb(var(--c-sand)); border-radius: 0.7rem; padding: 0.3rem; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22); }
+.fh-export-menu button { display: block; width: 100%; text-align: left; padding: 0.5rem 0.65rem; border-radius: 0.45rem; font-size: 0.85rem; color: rgb(var(--c-ink)); transition: background .12s; }
+.fh-export-menu button:hover { background: rgb(var(--c-sand) / 0.45); }
 
 .focus-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 20rem 1fr; max-width: 84rem; margin: 0 auto; width: 100%; }
 
