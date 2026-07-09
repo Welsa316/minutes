@@ -54,6 +54,7 @@ export const timeEntries = {
 
 export const invoices = {
   ...crud('/invoices'),
+  importOne: (body) => api.post('/invoices/import', body).then((r) => r.data),
   addLine: (id, body) => api.post(`/invoices/${id}/lines`, body).then((r) => r.data),
   updateLine: (lineId, body) => api.put(`/invoices/lines/${lineId}`, body).then((r) => r.data),
   removeLine: (lineId) => api.delete(`/invoices/lines/${lineId}`),

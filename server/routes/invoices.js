@@ -226,6 +226,106 @@ router.post('/:id/from-time', async (req, res, next) => {
   }
 });
 
+// --- one-shot import (the "Paste invoice" box) ---
+// Turn a whole invoice — drafted elsewhere, e.g. in a Claude chat — into a real
+// invoice without retyping: match the client by id/name/email (or create one),
+// auto-number unless a number is given, and add the line items. Money accepts
+// dollars (number or "$1,500.00") or explicit unit_cents.
+const pick = (o, keys) => { for (const k of keys) if (o[k] != null && o[k] !== '') return o[k]; return undefined; };
+function toCents(v) {
+  if (v == null || v === '') return 0;
+  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+}
+function toQty(v) {
+  if (v == null || v === '') return 1;
+  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(n) ? n : 1;
+}
+
+router.post('/import', async (req, res, next) => {
+  const b = req.body || {};
+  const rawLines = [b.line_items, b.lines, b.items, b.services].find(Array.isArray) || [];
+  const lines = rawLines.slice(0, 200).map((l) => (l && typeof l === 'object') ? {
+    label: String(pick(l, ['label', 'description', 'desc', 'item', 'name', 'service']) || '').slice(0, 500),
+    qty: toQty(pick(l, ['qty', 'quantity', 'hours', 'units'])),
+    unit_cents: 'unit_cents' in l ? Math.round(Number(l.unit_cents) || 0)
+      : toCents(pick(l, ['unit', 'rate', 'price', 'amount', 'unit_price', 'cost'])),
+  } : null).filter(Boolean);
+
+  const clientName = pick(b, ['client', 'client_name', 'customer', 'bill_to']);
+  const clientEmail = pick(b, ['client_email', 'email']);
+  if (!b.client_id && !clientName && !clientEmail && !lines.length) {
+    return res.status(400).json({ error: 'Nothing to import — need a client or at least one line item.' });
+  }
+  const status = STATUSES.includes(b.status) ? b.status : 'draft';
+  const taxPct = Number(pick(b, ['tax_pct', 'tax'])) || 0;
+  const notes = pick(b, ['notes', 'memo', 'note']) || null;
+  const number = pick(b, ['number', 'invoice_number', 'no']);
+  const issueDate = pick(b, ['issue_date', 'date', 'issued']) || null;
+  const dueDate = pick(b, ['due_date', 'due']) || null;
+
+  const conn = await pool.connect();
+  try {
+    await conn.query('BEGIN');
+
+    // 1. Resolve the client: id → exact name/email → create.
+    let clientId = null;
+    if (b.client_id) {
+      const r = await conn.query('SELECT id FROM clients WHERE id = $1 AND workspace_id = $2 AND deleted_at IS NULL', [b.client_id, req.workspaceId]);
+      clientId = r.rows[0]?.id ?? null;
+    }
+    if (!clientId && (clientName || clientEmail)) {
+      const r = await conn.query(
+        `SELECT id FROM clients WHERE workspace_id = $1 AND deleted_at IS NULL
+           AND ( ($2::text IS NOT NULL AND lower(name) = lower($2))
+              OR ($3::text IS NOT NULL AND lower(email) = lower($3)) )
+         ORDER BY id LIMIT 1`,
+        [req.workspaceId, clientName || null, clientEmail || null],
+      );
+      clientId = r.rows[0]?.id ?? null;
+      if (!clientId && clientName) {
+        const ins = await conn.query(
+          "INSERT INTO clients (workspace_id, name, email, status) VALUES ($1, $2, $3, 'active') RETURNING id",
+          [req.workspaceId, String(clientName).slice(0, 200), clientEmail || null],
+        );
+        clientId = ins.rows[0].id;
+      }
+    }
+
+    // 2. Create the invoice (auto-number INV-000N unless one was supplied).
+    const numExpr = number ? '$3' : "'INV-' || LPAD(n.seq::text, 4, '0')";
+    const numArg = number ? [String(number).slice(0, 60)] : [];
+    const r = await conn.query(
+      `WITH n AS (
+         SELECT COALESCE(MAX(CASE WHEN number ~ '^INV-\\d+$' THEN substring(number from 5)::bigint END), 0) + 1 AS seq
+         FROM invoices WHERE workspace_id = $1
+       )
+       INSERT INTO invoices (workspace_id, client_id, number, issue_date, due_date, status, tax_pct, notes)
+       SELECT $1, $2, ${numExpr}, COALESCE($${3 + numArg.length}::date, CURRENT_DATE), $${4 + numArg.length}::date, $${5 + numArg.length}, $${6 + numArg.length}, $${7 + numArg.length}
+       FROM n RETURNING id`,
+      [req.workspaceId, clientId, ...numArg, issueDate, dueDate, status, taxPct, notes],
+    );
+    const invId = r.rows[0].id;
+
+    // 3. Line items.
+    let sort = 0;
+    for (const l of lines) {
+      await conn.query(
+        'INSERT INTO invoice_line_items (invoice_id, label, qty, unit_cents, sort_order) VALUES ($1,$2,$3,$4,$5)',
+        [invId, l.label, l.qty, l.unit_cents, sort++],
+      );
+    }
+    await conn.query('COMMIT');
+    res.status(201).json(await detail(invId, req.workspaceId));
+  } catch (e) {
+    await conn.query('ROLLBACK').catch(() => {});
+    next(e);
+  } finally {
+    conn.release();
+  }
+});
+
 router.delete('/:id', async (req, res, next) => {
   try {
     const r = await query(
