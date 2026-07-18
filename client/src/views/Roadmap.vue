@@ -233,6 +233,9 @@ async function editPhase(p, body) {
   catch { Object.assign(p, prev); toast.error('Save failed'); }
 }
 async function removePhase(p) {
+  const name = p.title || `Untitled ${nounLower.value}`;
+  const n = p.steps.length;
+  if (!confirm(n ? `Delete ${nounLower.value} "${name}" and its ${n} step${n === 1 ? '' : 's'}?` : `Delete ${nounLower.value} "${name}"?`)) return;
   const idea = selected.value;
   const i = phases.value.indexOf(p);
   if (i > -1) phases.value.splice(i, 1);
@@ -499,6 +502,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
                     <button type="button" class="pmove" @click.stop="movePhase(p, -1)" :disabled="pi === 0" aria-label="Move phase up" title="Move up">↑</button>
                     <button type="button" class="pmove" @click.stop="movePhase(p, 1)" :disabled="pi === phases.length - 1" aria-label="Move phase down" title="Move down">↓</button>
                     <span class="pcard-grip" @click.stop title="Drag to reorder">⠿</span>
+                    <button type="button" class="pdel" @click.stop="removePhase(p)" :aria-label="`Delete ${nounLower}`" title="Delete">✕</button>
                   </div>
                   <div class="pcard-idx">{{ noun }} {{ pi + 1 }}</div>
                   <input
@@ -731,6 +735,8 @@ onUnmounted(() => { window.removeEventListener('keydown', onKey); if (typeof doc
 .pmove:disabled { opacity: 0.3; cursor: default; }
 .pcard-grip { cursor: grab; color: rgb(var(--c-slate-warm) / 0.5); font-size: 0.8rem; line-height: 1; }
 .pcard-grip:active { cursor: grabbing; }
+.pdel { width: 1.15rem; height: 1.15rem; display: grid; place-items: center; font-size: 0.7rem; line-height: 1; color: rgb(var(--c-slate-warm) / 0.6); border-radius: 0.25rem; }
+.pdel:hover { color: rgb(var(--c-terracotta)); background: rgb(var(--c-sand) / 0.5); }
 .pcard-idx { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; color: rgb(var(--c-slate-warm) / 0.85); margin-bottom: 0.15rem; }
 .pcard-title { width: 100%; font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1rem; line-height: 1.25; color: rgb(var(--c-ink)); background: transparent; border: 0; padding: 0; }
 .pcard-title:focus { outline: none; }
