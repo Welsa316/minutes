@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { useSettingsStore } from '../stores/settings.js';
 import { useWorkspaceStore } from '../stores/workspace.js';
+import { useUiStore } from '../stores/ui.js';
 import WorkspaceIcon from './WorkspaceIcon.vue';
 import WorkspaceCreate from './WorkspaceCreate.vue';
 import {
@@ -16,6 +17,7 @@ defineEmits(['logout']);
 const router = useRouter();
 const settings = useSettingsStore();
 const ws = useWorkspaceStore();
+const ui = useUiStore();
 
 const systemDark = ref(typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
 const isDark = computed(() => settings.theme === 'dark' || (settings.theme === 'system' && systemDark.value));
@@ -55,7 +57,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 </script>
 
 <template>
-  <aside class="rail">
+  <div v-if="ui.sidebarOpen" class="rail-backdrop" @click="ui.closeSidebar()" />
+  <aside class="rail" :class="{ open: ui.sidebarOpen }">
     <RouterLink to="/home" class="logo" title="Home">m</RouterLink>
 
     <nav class="nav">
@@ -67,7 +70,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
         v-slot="{ isActive, isExactActive, href, navigate }"
       >
         <a :href="href" @click="navigate" class="item" :class="{ active: l.exact ? isExactActive : isActive }" :title="l.label" :aria-label="l.label">
-          <component :is="l.icon" class="w-5 h-5" :stroke-width="1.9" />
+          <component :is="l.icon" class="w-5 h-5 shrink-0" :stroke-width="1.9" />
+          <span class="label">{{ l.label }}</span>
         </a>
       </RouterLink>
 
@@ -75,7 +79,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 
       <RouterLink v-for="l in GLOBAL_LINKS" :key="l.key" :to="l.to" custom v-slot="{ isActive, href, navigate }">
         <a :href="href" @click="navigate" class="item" :class="{ active: isActive }" :title="l.label" :aria-label="l.label">
-          <component :is="l.icon" class="w-5 h-5" :stroke-width="1.9" />
+          <component :is="l.icon" class="w-5 h-5 shrink-0" :stroke-width="1.9" />
+          <span class="label">{{ l.label }}</span>
         </a>
       </RouterLink>
     </nav>
@@ -83,7 +88,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
     <div class="bottom">
       <div ref="wsWrap" class="relative">
         <button class="item wsbtn" @click="wsOpen = !wsOpen" :style="{ background: accent }" :title="ws.active?.name || 'Workspace'" :aria-label="ws.active?.name || 'Workspace'">
-          <span class="text-warm text-base"><WorkspaceIcon :icon="activeIcon" /></span>
+          <span class="text-warm text-base shrink-0"><WorkspaceIcon :icon="activeIcon" /></span>
+          <span class="label">{{ ws.active?.name || 'Workspace' }}</span>
         </button>
         <div v-if="wsOpen" class="pop">
           <div class="pop-head">Workspaces</div>
@@ -105,10 +111,12 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
       </div>
 
       <button class="item" @click="toggleTheme" :title="isDark ? 'Light mode' : 'Dark mode'" :aria-label="isDark ? 'Light mode' : 'Dark mode'">
-        <component :is="isDark ? Sun : Moon" class="w-5 h-5" :stroke-width="1.9" />
+        <component :is="isDark ? Sun : Moon" class="w-5 h-5 shrink-0" :stroke-width="1.9" />
+        <span class="label">{{ isDark ? 'Light mode' : 'Dark mode' }}</span>
       </button>
       <button class="item" @click="$emit('logout')" title="Sign out" aria-label="Sign out">
-        <LogOut class="w-5 h-5" :stroke-width="1.9" />
+        <LogOut class="w-5 h-5 shrink-0" :stroke-width="1.9" />
+        <span class="label">Sign out</span>
       </button>
     </div>
 
@@ -175,4 +183,37 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 .pop-foot { border-top: 1px solid rgb(var(--c-sand)); margin-top: 0.25rem; padding-top: 0.25rem; display: flex; flex-direction: column; }
 .pop-foot button { text-align: left; font-size: 0.75rem; color: rgb(var(--c-slate-warm)); padding: 0.4rem 0.5rem; border-radius: 0.4rem; }
 .pop-foot button:hover { color: rgb(var(--c-ink)); background: rgb(var(--c-sand) / 0.5); }
+
+/* Labels are hidden on the desktop icon-rail; the mobile drawer shows them. */
+.label { display: none; }
+.rail-backdrop { display: none; }
+
+/* --- mobile: the rail becomes a labelled slide-in drawer (opened by the TopNav
+   hamburger), so content gets the full width and nav items get readable labels. --- */
+@media (max-width: 767px) {
+  .rail-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 45;
+    background: rgb(15 27 45 / 0.45); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  }
+  .rail {
+    position: fixed; top: 0; left: 0; z-index: 50;
+    width: 16rem; max-width: 82vw; height: 100dvh; align-items: stretch;
+    padding: 1rem 0.75rem; gap: 0.12rem;
+    transform: translateX(-100%); transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 0 50px rgb(0 0 0 / 0.35);
+    background: rgb(var(--c-surface) / 0.98);
+  }
+  .rail.open { transform: translateX(0); }
+  .logo { align-self: flex-start; margin: 0 0 0.75rem 0.4rem; }
+  .nav { align-items: stretch; gap: 0.1rem; }
+  .bottom { align-items: stretch; gap: 0.1rem; }
+  .divider { width: auto; margin: 0.5rem 0.6rem; }
+  .item { display: flex; align-items: center; width: 100%; height: 2.75rem; justify-content: flex-start; gap: 0.85rem; padding: 0 0.85rem; border-radius: 0.6rem; }
+  .item .label { display: inline; font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item.active::before { left: 0; height: 55%; }
+  .wsbtn { width: 100%; }
+  /* workspace switcher pops above the button, spanning the drawer width */
+  .pop { left: 0.5rem; right: 0.5rem; bottom: calc(100% + 0.5rem); width: auto; }
+}
+@media (prefers-reduced-motion: reduce) { .rail { transition: none; } }
 </style>

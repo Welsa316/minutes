@@ -1,10 +1,13 @@
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
+import { Menu } from 'lucide-vue-next';
 import { search } from '../api/endpoints.js';
 import { useShortcut, isTyping } from '../composables/useShortcuts.js';
+import { useUiStore } from '../stores/ui.js';
 
 const router = useRouter();
+const ui = useUiStore();
 const q = ref('');
 const results = ref(null);
 const open = ref(false);
@@ -58,6 +61,14 @@ function fmtDate(d) {
 
 <template>
   <header class="h-16 border-b border-sand bg-warm flex items-center px-4 sm:px-6 lg:px-8 gap-2 sm:gap-4 sticky top-0 z-10">
+    <button
+      type="button"
+      class="md:hidden -ml-1 grid place-items-center h-10 w-10 rounded-lg text-slate-warm hover:text-ink hover:bg-ink/5 shrink-0"
+      @click="ui.toggleSidebar()"
+      aria-label="Open menu"
+    >
+      <Menu class="h-5 w-5" :stroke-width="2" />
+    </button>
     <div ref="wrapper" class="relative flex-1 max-w-xl">
       <input
         ref="inputEl"
