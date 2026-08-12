@@ -168,8 +168,8 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 .item:hover { color: rgb(var(--c-ink)); background: rgb(var(--c-ink) / 0.06); }
 .item.active { color: rgb(var(--c-terracotta)); background: rgb(var(--c-terracotta) / 0.12); }
 .item.active::before {
-  content: ''; position: absolute; left: -0.6rem; top: 50%; transform: translateY(-50%);
-  width: 3px; height: 1.4rem; background: rgb(var(--c-terracotta)); border-radius: 0 3px 3px 0;
+  content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 1.4rem; background: rgb(var(--c-terracotta)); border-radius: 3px;
 }
 .label { font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
