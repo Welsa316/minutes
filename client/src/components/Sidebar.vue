@@ -59,7 +59,10 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 <template>
   <div v-if="ui.sidebarOpen" class="rail-backdrop" @click="ui.closeSidebar()" />
   <aside class="rail" :class="{ open: ui.sidebarOpen }">
-    <RouterLink to="/home" class="logo" title="Home">m</RouterLink>
+    <RouterLink to="/home" class="logo" title="Home">
+      <span class="logo-mark">m</span>
+      <span class="logo-word">Minutes</span>
+    </RouterLink>
 
     <nav class="nav">
       <RouterLink
@@ -126,46 +129,56 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 </template>
 
 <style scoped>
-/* Liquid-glass vertical rail: translucent, blurred, icon-only. */
+/* Liquid-glass vertical rail: translucent, blurred, icon + label. */
 .rail {
-  width: 4rem; flex-shrink: 0; height: 100dvh; z-index: 40;
-  display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
-  padding: 0.75rem 0;
+  width: 13.5rem; flex-shrink: 0; height: 100dvh; z-index: 40;
+  display: flex; flex-direction: column; align-items: stretch; gap: 0.12rem;
+  padding: 0.75rem 0.6rem;
   background: rgb(var(--c-surface) / 0.55);
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   border-right: 1px solid rgb(var(--c-sand) / 0.6);
 }
 
 .logo {
-  width: 2.25rem; height: 2.25rem; border-radius: 0.7rem; display: grid; place-items: center;
-  background: #C65D3E; color: #FBF8F3; text-decoration: none;
-  font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1.25rem; font-weight: 600; line-height: 1;
-  margin-bottom: 0.75rem; box-shadow: 0 4px 14px rgb(198 93 62 / 0.35);
-  transition: transform 0.15s ease;
+  display: flex; align-items: center; gap: 0.6rem; align-self: flex-start;
+  height: 2.25rem; padding: 0 0.35rem; margin-bottom: 0.85rem; text-decoration: none;
 }
-.logo:hover { transform: translateY(-1px); }
+.logo-mark {
+  width: 2.25rem; height: 2.25rem; border-radius: 0.7rem; display: grid; place-items: center; flex-shrink: 0;
+  background: #C65D3E; color: #FBF8F3;
+  font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1.25rem; font-weight: 600; line-height: 1;
+  box-shadow: 0 4px 14px rgb(198 93 62 / 0.35); transition: transform 0.15s ease;
+}
+.logo:hover .logo-mark { transform: translateY(-1px); }
+.logo-word {
+  font-family: 'IBM Plex Serif', Georgia, serif; font-size: 1.15rem; font-weight: 600; line-height: 1;
+  color: rgb(var(--c-ink));
+}
 
-.nav { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; width: 100%; overflow-y: auto; overflow-x: clip; }
-.bottom { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; width: 100%; }
-.divider { width: 1.4rem; height: 1px; background: rgb(var(--c-sand) / 0.8); margin: 0.4rem 0; }
+.nav { flex: 1; display: flex; flex-direction: column; align-items: stretch; gap: 0.08rem; width: 100%; overflow-y: auto; overflow-x: clip; }
+.bottom { display: flex; flex-direction: column; align-items: stretch; gap: 0.08rem; width: 100%; }
+.divider { height: 1px; background: rgb(var(--c-sand) / 0.8); margin: 0.45rem 0.7rem; }
 
 .item {
-  position: relative; width: 2.5rem; height: 2.5rem; border-radius: 0.7rem;
-  display: grid; place-items: center; cursor: pointer; border: 0; background: transparent;
+  position: relative; width: 100%; height: 2.6rem; border-radius: 0.6rem;
+  display: flex; align-items: center; gap: 0.8rem; padding: 0 0.7rem; text-align: left;
+  cursor: pointer; border: 0; background: transparent;
   color: rgb(var(--c-slate-warm)); transition: color 0.15s, background 0.15s;
 }
 .item:hover { color: rgb(var(--c-ink)); background: rgb(var(--c-ink) / 0.06); }
 .item.active { color: rgb(var(--c-terracotta)); background: rgb(var(--c-terracotta) / 0.12); }
 .item.active::before {
-  content: ''; position: absolute; left: -0.75rem; top: 50%; transform: translateY(-50%);
+  content: ''; position: absolute; left: -0.6rem; top: 50%; transform: translateY(-50%);
   width: 3px; height: 1.4rem; background: rgb(var(--c-terracotta)); border-radius: 0 3px 3px 0;
 }
-.wsbtn { color: #FBF8F3; box-shadow: 0 2px 8px rgb(0 0 0 / 0.2); }
-.wsbtn:hover { background: currentColor; } /* overridden by inline accent; keep hover subtle */
+.label { font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Workspace switch popover (escapes the rail to the right). */
+.wsbtn { color: #FBF8F3; box-shadow: 0 2px 8px rgb(0 0 0 / 0.2); }
+.wsbtn .label { color: #FBF8F3; font-weight: 600; }
+
+/* Workspace switch popover — pops above the button, spanning the rail width. */
 .pop {
-  position: absolute; bottom: 0; left: calc(100% + 0.6rem); width: 14rem; z-index: 60;
+  position: absolute; bottom: calc(100% + 0.5rem); left: 0; right: 0; z-index: 60;
   background: rgb(var(--c-surface)); border: 1px solid rgb(var(--c-sand));
   border-radius: 0.6rem; box-shadow: 0 18px 40px rgb(0 0 0 / 0.28); padding: 0.35rem;
 }
@@ -184,12 +197,10 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
 .pop-foot button { text-align: left; font-size: 0.75rem; color: rgb(var(--c-slate-warm)); padding: 0.4rem 0.5rem; border-radius: 0.4rem; }
 .pop-foot button:hover { color: rgb(var(--c-ink)); background: rgb(var(--c-sand) / 0.5); }
 
-/* Labels are hidden on the desktop icon-rail; the mobile drawer shows them. */
-.label { display: none; }
 .rail-backdrop { display: none; }
 
-/* --- mobile: the rail becomes a labelled slide-in drawer (opened by the TopNav
-   hamburger), so content gets the full width and nav items get readable labels. --- */
+/* --- mobile: the same labelled rail becomes a slide-in drawer (opened by the
+   TopNav hamburger), so content gets the full width. --- */
 @media (max-width: 767px) {
   .rail-backdrop {
     display: block; position: fixed; inset: 0; z-index: 45;
@@ -197,23 +208,12 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick));
   }
   .rail {
     position: fixed; top: 0; left: 0; z-index: 50;
-    width: 16rem; max-width: 82vw; height: 100dvh; align-items: stretch;
-    padding: 1rem 0.75rem; gap: 0.12rem;
+    width: 16rem; max-width: 82vw;
     transform: translateX(-100%); transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
     box-shadow: 0 0 50px rgb(0 0 0 / 0.35);
     background: rgb(var(--c-surface) / 0.98);
   }
   .rail.open { transform: translateX(0); }
-  .logo { align-self: flex-start; margin: 0 0 0.75rem 0.4rem; }
-  .nav { align-items: stretch; gap: 0.1rem; }
-  .bottom { align-items: stretch; gap: 0.1rem; }
-  .divider { width: auto; margin: 0.5rem 0.6rem; }
-  .item { display: flex; align-items: center; width: 100%; height: 2.75rem; justify-content: flex-start; gap: 0.85rem; padding: 0 0.85rem; border-radius: 0.6rem; }
-  .item .label { display: inline; font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .item.active::before { left: 0; height: 55%; }
-  .wsbtn { width: 100%; }
-  /* workspace switcher pops above the button, spanning the drawer width */
-  .pop { left: 0.5rem; right: 0.5rem; bottom: calc(100% + 0.5rem); width: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .rail { transition: none; } }
 </style>
