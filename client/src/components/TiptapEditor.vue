@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/vue-3';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
+import { AnimatedTaskItem } from '../composables/animatedTaskItem.js';
 import Link from '@tiptap/extension-link';
 import Mention from '@tiptap/extension-mention';
 import Image from '@tiptap/extension-image';
@@ -146,7 +146,7 @@ const editor = useEditor({
       heading: { levels: [1, 2, 3] },
     }),
     TaskList,
-    TaskItem.configure({ nested: true }),
+    AnimatedTaskItem.configure({ nested: true }),
     Link.configure({
       openOnClick: false,
       autolink: true,
@@ -440,10 +440,34 @@ const isActive = (n, opts) => editor.value?.isActive(n, opts) || false;
 }
 .tp-prose ul[data-type="taskList"] { list-style: none; padding-left: 0; }
 .tp-prose ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; }
-.tp-prose ul[data-type="taskList"] li > label { margin-top: 0.25rem; }
-.tp-prose ul[data-type="taskList"] li > label input[type="checkbox"] { accent-color: theme('colors.terracotta'); }
+/* Checklist: the same draw-on check as the Roadmap. Checked text is greyed but
+   stays readable — no strike-through. */
+.tp-prose ul[data-type="taskList"] li > label {
+  flex-shrink: 0; margin-top: 0.15rem; position: relative;
+  width: 1.2rem; height: 1.2rem; display: grid; place-items: center;
+  cursor: pointer; color: rgb(var(--c-slate-warm) / 0.55);
+  transition: color 0.3s ease;
+}
+.tp-prose ul[data-type="taskList"] li > label:hover { color: rgb(var(--c-terracotta) / 0.7); }
+.tp-prose ul[data-type="taskList"] li[data-checked="true"] > label { color: rgb(var(--c-terracotta)); }
+.tp-prose ul[data-type="taskList"] li > label:has(input:focus-visible) {
+  outline: 2px solid rgb(var(--c-terracotta) / 0.6); outline-offset: 3px; border-radius: 5px;
+}
+.tp-prose ul[data-type="taskList"] li > label input[type="checkbox"] {
+  position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer;
+}
+.tp-prose ul[data-type="taskList"] li > label span { display: grid; place-items: center; pointer-events: none; }
+.tp-prose ul[data-type="taskList"] li .acheck { width: 1.15rem; height: 1.15rem; display: block; overflow: visible; }
+.tp-prose ul[data-type="taskList"] li .acheck-path {
+  stroke-dasharray: 132; stroke-dashoffset: 0;
+  transition: stroke-dasharray 0.45s ease-in-out, stroke-dashoffset 0.45s ease-in-out;
+}
+.tp-prose ul[data-type="taskList"] li .acheck-path.is-checked { stroke-dasharray: 150; stroke-dashoffset: -134; }
 .tp-prose ul[data-type="taskList"] li > div { flex: 1; }
-.tp-prose ul[data-type="taskList"] li[data-checked="true"] > div { color: theme('colors.slate-warm'); text-decoration: line-through; }
+.tp-prose ul[data-type="taskList"] li[data-checked="true"] > div { color: theme('colors.slate-warm'); }
+@media (prefers-reduced-motion: reduce) {
+  .tp-prose ul[data-type="taskList"] li .acheck-path { transition: none; }
+}
 .tp-prose blockquote { border-left: 3px solid theme('colors.sand'); padding-left: 0.75rem; color: theme('colors.slate-warm'); margin: 0.5rem 0; }
 .tp-prose code { background: theme('colors.sand'); padding: 0.125rem 0.25rem; border-radius: 0.25rem; font-size: 0.875em; }
 .tp-prose pre { background: theme('colors.ink'); color: theme('colors.warm'); padding: 0.75rem; border-radius: 0.375rem; overflow-x: auto; }
